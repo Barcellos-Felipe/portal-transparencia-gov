@@ -11,7 +11,7 @@ import logging
 import os
 import zipfile
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Callable, Dict
 
 import httpx
 import polars as pl
@@ -24,10 +24,32 @@ ZIP_URL_DEFAULT = os.getenv('ZIP_URL_DEFAULT', '')
 
 DATA_DIR = Path(__file__).parents[1].resolve() / 'tmp_data'
 
-FILENAMES = [
-    'EmendasParlamentares.csv',
-    'EmendasParlamentares_Convenios.csv',
-    'EmendasParlamentares_PorFavorecido.csv',
+# Map CSV filenames to their dataset keys and filters
+CSV_CONFIGS = [
+    {
+        'csv_file': 'EmendasParlamentares.csv',
+        'dataset_key': 'emendas',
+        'json_file': 'emendas.json',
+        'filter_col': 'Localidade de aplicação do recurso',
+        'filter_value': 'CAMPO GRANDE - MS',
+        'filter_type': 'contains',
+    },
+    {
+        'csv_file': 'EmendasParlamentares_Convenios.csv',
+        'dataset_key': 'convenios',
+        'json_file': 'emendas_convenios.json',
+        'filter_col': 'Localidade do gasto',
+        'filter_value': 'CAMPO GRANDE - MS',
+        'filter_type': 'contains',
+    },
+    {
+        'csv_file': 'EmendasParlamentares_PorFavorecido.csv',
+        'dataset_key': 'por_favorecido',
+        'json_file': 'emendas_por_favorecido.json',
+        'filter_col': None,
+        'filter_value': None,
+        'filter_type': 'multi',
+    },
 ]
 
 OUTPUT_MAP = {
@@ -42,8 +64,9 @@ def _ensure_data_dir() -> None:
 
 
 async def _download_zip(url: str, target_zip: Path) -> None:
+    """Download ZIP file from URL."""
     async with httpx.AsyncClient(timeout=120) as client:
-        async with client.stream("GET", url) as response:
+        async with client.stream('GET', url) as response:
             response.raise_for_status()
             with open(target_zip, 'wb') as f:
                 async for chunk in response.aiter_bytes():
@@ -51,67 +74,117 @@ async def _download_zip(url: str, target_zip: Path) -> None:
 
 
 def _extract_csvs(zip_path: Path) -> None:
+    """Extract only the CSV files we need from the ZIP."""
     with zipfile.ZipFile(zip_path, 'r') as zf:
-        for name in FILENAMES:
-            zf.extract(name, DATA_DIR)
-    path_to_delete = DATA_DIR / 'emendas.zip'
-    path_to_delete.unlink()
+        for config in CSV_CONFIGS:
+            csv_name = config['csv_file']
+            zf.extract(csv_name, DATA_DIR)
+    # Delete ZIP immediately after extraction
+    zip_path.unlink()
 
 
-def _read_data(file: Path) -> pl.LazyFrame:
-    return pl.read_csv(file, separator=';', encoding='latin1', infer_schema_length=0).lazy()
+def _read_and_filter_csv(csv_path: Path, config: Dict[str, Any]) -> pl.LazyFrame:
+    """Read CSV and apply the appropriate filter based on config."""
+    df = pl.read_csv(csv_path, separator=';', encoding='latin1', infer_schema_length=0).lazy()
 
-def _save_json() -> Dict[str, Any]:
-    emendas_path = DATA_DIR / 'EmendasParlamentares.csv'
-    convenios_path = DATA_DIR / 'EmendasParlamentares_Convenios.csv'
-    favorecido_path = DATA_DIR / 'EmendasParlamentares_PorFavorecido.csv'
-    datasets = {}
-    for idx, path in enumerate([emendas_path, convenios_path, favorecido_path]):
-        df = _read_data(path)
-        match idx:
-            case 0:
-                df = df.filter(pl.col('Localidade de aplicação do recurso').str.contains('CAMPO GRANDE - MS'))
-                name = 'emendas'
-            case 1:
-                df = df.filter(pl.col('Localidade do gasto').str.contains('CAMPO GRANDE - MS'))
-                name = 'convenios'
-            case 2:
-                df = df.filter((pl.col('Município Favorecido') == 'CAMPO GRANDE') & (pl.col('UF Favorecido') == 'MS'))
-                name = 'por_favorecido'
-        logging.info(f'Saving and converting: {name}')
-        logging.info('Collecting LazyDataframe')
-        dataset = df.collect().to_dicts()
-        logging.info('LazyDataframe Extracted')
-        datasets[name] = dataset
+    filter_type = config['filter_type']
+    if filter_type == 'contains':
+        df = df.filter(pl.col(config['filter_col']).str.contains(config['filter_value']))
+    elif filter_type == 'multi':
+        df = df.filter((pl.col('Município Favorecido') == 'CAMPO GRANDE') & (pl.col('UF Favorecido') == 'MS'))
 
-        out_name = OUTPUT_MAP.get(name)
-        out_path = DATA_DIR / out_name
+    return df
 
-        with open(out_path, 'w', encoding='utf-8') as f:
-            f.write('[')
-            first = True
 
-            for batch in df.collect_batches(chunk_size=1000):
-                for row in batch.to_dicts():
-                    if not first:
-                        f.write(',')
-                    else:
-                        first = False
-                    json.dump(row, f, ensure_ascii=False)
-            f.write(']')
-        path.unlink()
-    return datasets
+def _csv_to_json(csv_path: Path, json_path: Path, config: Dict[str, Any]) -> None:
+    """Convert filtered CSV to JSON and delete CSV immediately."""
+    logging.info(f'Processing: {config["dataset_key"]}')
 
-def _delete_data_files() -> None:
-    data_files = [*OUTPUT_MAP.values(), *FILENAMES , 'emendas.zip']
-    for fname in data_files:
-        path = DATA_DIR / fname
-        if path.exists():
-            path.unlink()
+    # Read and filter CSV
+    df = _read_and_filter_csv(csv_path, config)
+
+    # Write JSON in streaming fashion to minimize RAM
+    with open(json_path, 'w', encoding='utf-8') as f:
+        f.write('[')
+        first = True
+
+        for batch in df.collect_batches(chunk_size=1000):
+            for row in batch.to_dicts():
+                if not first:
+                    f.write(',')
+                else:
+                    first = False
+                json.dump(row, f, ensure_ascii=False)
+        f.write(']')
+
+    # Delete CSV immediately after conversion
+    csv_path.unlink()
+    logging.info(f'Converted and deleted CSV: {csv_path.name}')
+
+
+def _load_json_and_delete(json_path: Path) -> list[Dict[str, Any]]:
+    """Load JSON data and delete the file immediately."""
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    # Delete JSON immediately after loading
+    json_path.unlink()
+    logging.info(f'Loaded and deleted JSON: {json_path.name}')
+
+    return data
+
+
+async def perform_update_streaming(db_update_callback: Callable[[str, list], None]) -> None:
+    """Download, extract, and process datasets with minimal RAM usage.
+
+    Process flow:
+    1. Download ZIP
+    2. Extract CSV files
+    3. For each CSV:
+       a. Convert to JSON (delete CSV)
+       b. Load JSON data
+       c. Update database via callback
+       d. Delete JSON
+
+    Args:
+        db_update_callback: Function that takes (dataset_key, data) and updates the database
+    """
+    _ensure_data_dir()
+    zip_path = DATA_DIR / 'emendas.zip'
+
+    logging.info('Downloading ZIP')
+    await _download_zip(ZIP_URL_DEFAULT, zip_path)
+
+    logging.info('Extracting CSV files')
+    _extract_csvs(zip_path)
+
+    # Process each CSV file sequentially
+    for config in CSV_CONFIGS:
+        csv_path = DATA_DIR / config['csv_file']
+        json_path = DATA_DIR / config['json_file']
+        dataset_key = config['dataset_key']
+
+        # Convert CSV to JSON (deletes CSV)
+        _csv_to_json(csv_path, json_path, config)
+
+        # Load JSON data (deletes JSON)
+        data = _load_json_and_delete(json_path)
+
+        # Update database immediately
+        logging.info(f'Updating database: {dataset_key}')
+        db_update_callback(dataset_key, data)
+
+        # Free memory
+        del data
+
+    logging.info('Streaming update completed')
 
 
 async def perform_update() -> Dict[str, Any]:
     """Download, extract, filter, and persist datasets.
+
+    DEPRECATED: This method loads all data into memory.
+    Use perform_update_streaming() with a database callback instead.
 
     Returns dict mapping dataset key to list-of-dicts.
     """
@@ -126,6 +199,56 @@ async def perform_update() -> Dict[str, Any]:
     logging.info('Deleting old files')
     _delete_data_files()
     return datasets
+
+
+def _read_data(file: Path) -> pl.LazyFrame:
+    """Legacy function for backward compatibility."""
+    return pl.read_csv(file, separator=';', encoding='latin1', infer_schema_length=0).lazy()
+
+
+def _save_json() -> Dict[str, Any]:
+    """Legacy function - loads all data into memory.
+
+    DEPRECATED: Use perform_update_streaming() instead for better memory efficiency.
+    """
+    datasets = {}
+    for config in CSV_CONFIGS:
+        csv_path = DATA_DIR / config['csv_file']
+        json_path = DATA_DIR / config['json_file']
+        dataset_key = config['dataset_key']
+
+        df = _read_and_filter_csv(csv_path, config)
+
+        logging.info(f'Saving and converting: {dataset_key}')
+        logging.info('Collecting LazyDataframe')
+        dataset = df.collect().to_dicts()
+        logging.info('LazyDataframe Extracted')
+        datasets[dataset_key] = dataset
+
+        with open(json_path, 'w', encoding='utf-8') as f:
+            f.write('[')
+            first = True
+
+            for batch in df.collect_batches(chunk_size=1000):
+                for row in batch.to_dicts():
+                    if not first:
+                        f.write(',')
+                    else:
+                        first = False
+                    json.dump(row, f, ensure_ascii=False)
+            f.write(']')
+        csv_path.unlink()
+    return datasets
+
+
+def _delete_data_files() -> None:
+    """Delete all CSV and JSON files from the data directory."""
+    csv_files = [config['csv_file'] for config in CSV_CONFIGS]
+    data_files = [*OUTPUT_MAP.values(), *csv_files, 'emendas.zip']
+    for fname in data_files:
+        path = DATA_DIR / fname
+        if path.exists():
+            path.unlink()
 
 
 async def load_cached_or_update(force: bool = False) -> Dict[str, Any]:

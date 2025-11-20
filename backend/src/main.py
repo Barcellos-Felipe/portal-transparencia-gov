@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import os
 from typing import Any, Dict
@@ -10,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from .cache_manager import CacheManager
 from .database import CachedData, SessionLocal, get_db, init_db
-from .gov_api import fetch_all_datasets, refresh_datasets
+from .gov_api import fetch_all_datasets
 
 
 def get_allowed_origins() -> list[str]:
@@ -62,14 +61,19 @@ app.add_middleware(
 
 async def _run_update():
     from .database import SessionLocal
+    from .update import perform_update_streaming
 
     db = SessionLocal()
     try:
         cache = CacheManager(db)
-        datasets = await fetch_all_datasets()
-        for key, data in datasets.items():
-            cache.set(key, data)
-        logging.info(f'Scheduled update completed: {", ".join(datasets.keys())}')
+
+        def update_db(dataset_key: str, data: list) -> None:
+            """Callback to update database for each dataset."""
+            cache.set(dataset_key, data)
+            logging.info(f'Updated dataset: {dataset_key}')
+
+        await perform_update_streaming(update_db)
+        logging.info('Scheduled update completed')
     except Exception as e:
         logging.exception(f'Scheduled update failed: {e}')
     finally:
@@ -104,13 +108,26 @@ async def refresh(token: str | None = None, force: bool = True) -> Dict[str, str
     if expected and token != expected:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Unauthorized')
     from .database import SessionLocal
+    from .update import perform_update_streaming
 
     db = SessionLocal()
     try:
         cache = CacheManager(db)
-        datasets = await (refresh_datasets() if force else fetch_all_datasets(force=False))
-        for key, data in datasets.items():
-            cache.set(key, data)
-        return {'status': 'ok', 'updated': ', '.join(datasets.keys())}
+        updated_keys = []
+
+        def update_db(dataset_key: str, data: list) -> None:
+            """Callback to update database for each dataset."""
+            cache.set(dataset_key, data)
+            updated_keys.append(dataset_key)
+
+        if force:
+            await perform_update_streaming(update_db)
+        else:
+            datasets = await fetch_all_datasets(force=False)
+            for key, data in datasets.items():
+                cache.set(key, data)
+                updated_keys.append(key)
+
+        return {'status': 'ok', 'updated': ', '.join(updated_keys)}
     finally:
         db.close()

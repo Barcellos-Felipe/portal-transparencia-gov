@@ -4,6 +4,10 @@ version = "0.1.0"
 description = "API"
 authors = ["Felipe <barcellossfelipe@gmail.com>"]
 
+packages = [
+    { include = "src" }
+]
+
 [tool.poetry.dependencies]
 python = "3.12.10"
 apscheduler = "3.11.1"

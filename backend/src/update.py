@@ -7,6 +7,7 @@ Use perform_update() to download, process, and persist datasets.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import zipfile
 from pathlib import Path
@@ -16,6 +17,7 @@ import httpx
 import polars as pl
 from dotenv import load_dotenv
 
+logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 ZIP_URL_DEFAULT = os.getenv('ZIP_URL_DEFAULT', '')
@@ -76,6 +78,7 @@ def _save_json() -> Dict[str, Any]:
             case 2:
                 df = df.filter((pl.col('Município Favorecido') == 'CAMPO GRANDE') & (pl.col('UF Favorecido') == 'MS'))
                 name = 'por_favorecido'
+        logging.info(f'Saving and converting: {name}')
         dataset = df.collect().to_dicts()
         datasets[name] = dataset
         out_name = OUTPUT_MAP.get(name)
@@ -100,8 +103,11 @@ async def perform_update() -> Dict[str, Any]:
     """
     _ensure_data_dir()
     zip_path = DATA_DIR / 'emendas.zip'
+    logging.info('Downloading ZIP')
     await _download_zip(ZIP_URL_DEFAULT, zip_path)
+    logging.info('Extracting csv files')
     _extract_csvs(zip_path)
+    logging.info('Starting save_json')
     datasets = _save_json()
     _delete_data_files()
     return datasets

@@ -41,56 +41,52 @@ def _ensure_data_dir() -> None:
 
 async def _download_zip(url: str, target_zip: Path) -> None:
     async with httpx.AsyncClient(timeout=120) as client:
-        r = await client.get(url)
-        r.raise_for_status()
-        target_zip.write_bytes(r.content)
+        async with client.stream("GET", url) as response:
+            response.raise_for_status()
+            with open(target_zip, 'wb') as f:
+                async for chunk in response.aiter_bytes():
+                    f.write(chunk)
 
 
 def _extract_csvs(zip_path: Path) -> None:
     with zipfile.ZipFile(zip_path, 'r') as zf:
         for name in FILENAMES:
             zf.extract(name, DATA_DIR)
+    path_to_delete = DATA_DIR / 'emendas.zip'
+    path_to_delete.unlink()
 
 
-def _read_data(file: Path) -> pl.DataFrame:
-    return pl.read_csv(file, separator=';', encoding='latin1', infer_schema_length=0)
+def _read_data(file: Path) -> pl.LazyFrame:
+    return pl.read_csv(file, separator=';', encoding='latin1', infer_schema_length=0).lazy()
 
-
-def _load_filter() -> Dict[str, pl.DataFrame]:
+def _save_json() -> Dict[str, Any]:
     emendas_path = DATA_DIR / 'EmendasParlamentares.csv'
     convenios_path = DATA_DIR / 'EmendasParlamentares_Convenios.csv'
     favorecido_path = DATA_DIR / 'EmendasParlamentares_PorFavorecido.csv'
-
-    df_emendas = _read_data(emendas_path).filter(
-        pl.col('Localidade de aplicação do recurso').str.contains('CAMPO GRANDE - MS')
-    )
-
-    df_convenios = _read_data(convenios_path).filter(
-        pl.col('Localidade do gasto').str.contains('CAMPO GRANDE - MS')
-    )
-
-    df_por_fav = _read_data(favorecido_path).filter(
-        (pl.col('Município Favorecido') == 'CAMPO GRANDE') & (pl.col('UF Favorecido') == 'MS')
-    )
-
-    return {
-        'emendas': df_emendas,
-        'convenios': df_convenios,
-        'por_favorecido': df_por_fav,
-    }
-
-
-def _save_json(datasets: Dict[str, Any]) -> None:
-    for key, rows in datasets.items():
-        out_name = OUTPUT_MAP.get(key)
-        if not out_name:
-            continue
+    datasets = {}
+    for idx, path in enumerate([emendas_path, convenios_path, favorecido_path]):
+        df = _read_data(path)
+        match idx:
+            case 0:
+                df = df.filter(pl.col('Localidade de aplicação do recurso').str.contains('CAMPO GRANDE - MS'))
+                name = 'emendas'
+            case 1:
+                df = df.filter(pl.col('Localidade do gasto').str.contains('CAMPO GRANDE - MS'))
+                name = 'convenios'
+            case 2:
+                df = df.filter((pl.col('Município Favorecido') == 'CAMPO GRANDE') & (pl.col('UF Favorecido') == 'MS'))
+                name = 'por_favorecido'
+        dataset = df.collect().to_dicts()
+        datasets[name] = dataset
+        out_name = OUTPUT_MAP.get(name)
         out_path = DATA_DIR / out_name
         with open(out_path, 'w', encoding='utf-8') as f:
-            json.dump(rows, f, ensure_ascii=False, indent=2)
+            json.dump(dataset, f, ensure_ascii=False)
+        path.unlink()
+    return datasets
 
 def _delete_data_files() -> None:
-    data_files = [*OUTPUT_MAP.values(),*FILENAMES , 'emendas.zip']
+    data_files = [*OUTPUT_MAP.values(), *FILENAMES , 'emendas.zip']
     for fname in data_files:
         path = DATA_DIR / fname
         if path.exists():
@@ -106,9 +102,7 @@ async def perform_update() -> Dict[str, Any]:
     zip_path = DATA_DIR / 'emendas.zip'
     await _download_zip(ZIP_URL_DEFAULT, zip_path)
     _extract_csvs(zip_path)
-    dataframes = _load_filter()
-    datasets: Dict[str, Any] = {k: df.to_dicts() for k, df in dataframes.items()}
-    _save_json(datasets)
+    datasets = _save_json()
     _delete_data_files()
     return datasets
 

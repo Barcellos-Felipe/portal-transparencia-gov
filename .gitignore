@@ -6,3 +6,4 @@ Pipfile.lock
 _templates
 data
 backend/tmp_data
+*.zip

@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "api-transparencia-gov"
+version = "0.1.0"
+description = "API"
+authors = ["Felipe <barcellossfelipe@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "3.12.10"
+apscheduler = "3.11.1"
+fastapi = "0.121.2"
+httpx = "0.28.1"
+polars = "1.35.2"
+python-dotenv = "1.2.1"
+sqlalchemy = "2.0.44"
+uvicorn[standard] = "0.38.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

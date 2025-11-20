@@ -123,6 +123,7 @@ async def perform_update() -> Dict[str, Any]:
     _extract_csvs(zip_path)
     logging.info('Starting save_json')
     datasets = _save_json()
+    logging.info('Deleting old files')
     _delete_data_files()
     return datasets
 

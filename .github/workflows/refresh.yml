@@ -1,0 +1,17 @@
+name: Daily Refresh
+
+on:
+  schedule:
+    - cron: "0 3 * * *"  # 03:00 UTC daily
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call API refresh endpoint
+        env:
+          REFRESH_TOKEN: ${{ secrets.REFRESH_TOKEN }}
+          API_BASE: ${{ secrets.API_BASE_URL }}
+        run: |
+          curl -X POST "${API_BASE}/api/refresh?token=${REFRESH_TOKEN}" -sSf || exit 1

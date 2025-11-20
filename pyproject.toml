@@ -1,0 +1,16 @@
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "Q", "I"]
+ignore = ["Q000", "F405"]
+
+[tool.ruff.format]
+quote-style = 'single'
+
+[tool.mypy]
+disable_error_code = ["union-attr", "attr-defined", "import-untyped", "import-not-found"]
+
+[tool.pytest.ini_options]
+pythonpath = ['.']
+testpaths = ['tests']

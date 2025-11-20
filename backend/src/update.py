@@ -79,7 +79,9 @@ def _save_json() -> Dict[str, Any]:
                 df = df.filter((pl.col('Município Favorecido') == 'CAMPO GRANDE') & (pl.col('UF Favorecido') == 'MS'))
                 name = 'por_favorecido'
         logging.info(f'Saving and converting: {name}')
+        logging.info('Collecting LazyDataframe')
         dataset = df.collect().to_dicts()
+        logging.info('LazyDataframe Extracted')
         datasets[name] = dataset
         out_name = OUTPUT_MAP.get(name)
         out_path = DATA_DIR / out_name

@@ -83,10 +83,22 @@ def _save_json() -> Dict[str, Any]:
         dataset = df.collect().to_dicts()
         logging.info('LazyDataframe Extracted')
         datasets[name] = dataset
+
         out_name = OUTPUT_MAP.get(name)
         out_path = DATA_DIR / out_name
+
         with open(out_path, 'w', encoding='utf-8') as f:
-            json.dump(dataset, f, ensure_ascii=False)
+            f.write('[')
+            first = True
+
+            for batch in df.collect_batches(chunk_size=1000):
+                for row in batch.to_dicts():
+                    if not first:
+                        f.write(',')
+                    else:
+                        first = False
+                    json.dump(row, f, ensure_ascii=False)
+            f.write(']')
         path.unlink()
     return datasets
 

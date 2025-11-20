@@ -12,7 +12,7 @@ httpx = "0.28.1"
 polars = "1.35.2"
 python-dotenv = "1.2.1"
 sqlalchemy = "2.0.44"
-uvicorn[standard] = "0.38.0"
+"uvicorn[standard]" = "0.38.0"
 
 [build-system]
 requires = ["poetry-core"]

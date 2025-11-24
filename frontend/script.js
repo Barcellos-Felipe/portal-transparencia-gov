@@ -105,12 +105,9 @@ const obterOpcoesEixoX = (rotacao = false) => ({
 async function carregarDados() {
     try {
         const [resEmendas, resConvenios, resFavorecidos] = await Promise.all([
-            // fetch('https://portal-transparencia-gov.onrender.com/api/data/emendas'),
-            // fetch('https://portal-transparencia-gov.onrender.com/api/data/convenios'),
-            // fetch('https://portal-transparencia-gov.onrender.com/api/data/por_favorecido')
-            fetch('../data/emendas_web.json'),
-            fetch('../data/emendas_convenios_web.json'),
-            fetch('../data/emendas_por_favorecido_web.json')
+            fetch('https://portal-transparencia-gov.onrender.com/api/data/emendas'),
+            fetch('https://portal-transparencia-gov.onrender.com/api/data/convenios'),
+            fetch('https://portal-transparencia-gov.onrender.com/api/data/por_favorecido')
         ]);
 
         dadosEmendas = await resEmendas.json();

@@ -3,20 +3,54 @@ let dadosEmendas = [];
 let dadosConvenios = [];
 let dadosFavorecidos = [];
 
-// Dados filtrados para paginação
-let dadosEmendasFiltrados = [];
-let dadosConveniosFiltrados = [];
-let dadosFavorecidosFiltrados = [];
-
-// Estado da paginação
-let paginacaoEmendas = { paginaAtual: 1, itensPorPagina: 10 };
-let paginacaoConvenios = { paginaAtual: 1, itensPorPagina: 10 };
-let paginacaoFavorecidos = { paginaAtual: 1, itensPorPagina: 10 };
-
-// Estado da ordenação
-let ordenacaoEmendas = { coluna: null, direcao: 'asc' };
-let ordenacaoConvenios = { coluna: null, direcao: 'asc' };
-let ordenacaoFavorecidos = { coluna: null, direcao: 'asc' };
+// Configuração centralizada de tabelas
+const tabelasConfig = {
+    emendas: {
+        dados: () => dadosEmendas,
+        dadosFiltrados: [],
+        paginacao: { paginaAtual: 1, itensPorPagina: 10 },
+        ordenacao: { coluna: null, direcao: 'asc' },
+        colunas: ['Ano da Emenda', 'Nome do Autor da Emenda', 'Tipo de Emenda', 'Nome Função', 'Nome Subfunção', 'Valor Empenhado', 'Valor Pago'],
+        renderLinha: (item) => [
+            item['Ano da Emenda'] || '-',
+            item['Nome do Autor da Emenda'] || '-',
+            item['Tipo de Emenda'] || '-',
+            item['Nome Função'] || '-',
+            item['Nome Subfunção'] || '-',
+            `<span class="valor-monetario">${formatarMoeda(item['Valor Empenhado'])}</span>`,
+            `<span class="valor-monetario">${formatarMoeda(item['Valor Pago'])}</span>`
+        ]
+    },
+    convenios: {
+        dados: () => dadosConvenios,
+        dadosFiltrados: [],
+        paginacao: { paginaAtual: 1, itensPorPagina: 10 },
+        ordenacao: { coluna: null, direcao: 'asc' },
+        colunas: ['Data Publicação Convênio', 'Número Convênio', 'Convenente', 'Nome Função', 'Valor Convênio', 'Objeto Convênio'],
+        renderLinha: (item) => [
+            item['Data Publicação Convênio'] || '-',
+            item['Número Convênio'] || '-',
+            item['Convenente'] || '-',
+            item['Nome Função'] || '-',
+            `<span class="valor-monetario">${formatarMoeda(item['Valor Convênio'])}</span>`,
+            (item['Objeto Convênio'] || '-').substring(0, 100) + '...'
+        ]
+    },
+    favorecidos: {
+        dados: () => dadosFavorecidos,
+        dadosFiltrados: [],
+        paginacao: { paginaAtual: 1, itensPorPagina: 10 },
+        ordenacao: { coluna: null, direcao: 'asc' },
+        colunas: ['Ano/Mês', 'Favorecido', 'Tipo Favorecido', 'Nome do Autor da Emenda', 'Valor Recebido'],
+        renderLinha: (item) => [
+            item['Ano/Mês'] || '-',
+            item['Favorecido'] || '-',
+            item['Tipo Favorecido'] || '-',
+            item['Nome do Autor da Emenda'] || '-',
+            `<span class="valor-monetario">${formatarMoeda(item['Valor Recebido'])}</span>`
+        ]
+    }
+};
 
 // Gráficos
 let funcaoChart, anoChart, parlamentaresChart, tipoEmendaChart, favorecidosChart;
@@ -38,6 +72,34 @@ const formatarNumero = (valor) => {
         maximumFractionDigits: 0
     }).format(valor);
 };
+
+// Utilitários compartilhados para gráficos
+const isMobile = () => window.innerWidth < 768;
+const obterFontSize = (mobileSize, desktopSize) => isMobile() ? mobileSize : desktopSize;
+const formatarValorEixo = (value) => 'R$ ' + (value / 1000000).toFixed(1) + 'M';
+
+const opcoesComuns = {
+    responsive: true,
+    maintainAspectRatio: false
+};
+
+const obterOpcoesEixoY = () => ({
+    beginAtZero: true,
+    ticks: {
+        callback: formatarValorEixo,
+        font: { size: obterFontSize(10, 12) }
+    }
+});
+
+const obterOpcoesEixoX = (rotacao = false) => ({
+    ticks: {
+        font: { size: obterFontSize(9, 11) },
+        ...(rotacao && {
+            maxRotation: isMobile() ? 45 : 0,
+            minRotation: isMobile() ? 45 : 0
+        })
+    }
+});
 
 // Carregar dados
 async function carregarDados() {
@@ -68,9 +130,9 @@ function inicializarDashboard() {
     criarGraficos();
     
     // Inicializar dados filtrados
-    dadosEmendasFiltrados = [...dadosEmendas];
-    dadosConveniosFiltrados = [...dadosConvenios];
-    dadosFavorecidosFiltrados = [...dadosFavorecidos];
+    Object.keys(tabelasConfig).forEach(tipo => {
+        tabelasConfig[tipo].dadosFiltrados = [...tabelasConfig[tipo].dados()];
+    });
     
     popularTabelas();
     popularFiltros();
@@ -78,7 +140,6 @@ function inicializarDashboard() {
     configurarPaginacao();
     configurarOrdenacao();
     atualizarDataAtualizacao();
-    // Interações adicionais e melhorias de usabilidade
     inicializarInteracoesExtras();
 }
 
@@ -462,9 +523,36 @@ function criarGraficoFavorecidos() {
 
 // Popular Tabelas
 function popularTabelas() {
-    popularTabelaEmendas();
-    popularTabelaConvenios();
-    popularTabelaFavorecidos();
+    popularTabela('emendas');
+    popularTabela('convenios');
+    popularTabela('favorecidos');
+}
+
+function popularTabela(tipo) {
+    const config = tabelasConfig[tipo];
+    const { paginaAtual, itensPorPagina } = config.paginacao;
+    
+    let dadosOrdenados = config.dadosFiltrados;
+    if (config.ordenacao.coluna) {
+        const th = document.querySelector(`#table-${tipo} th[data-column="${config.ordenacao.coluna}"]`);
+        const tipoDado = th.getAttribute('data-type');
+        dadosOrdenados = ordenarDados(config.dadosFiltrados, config.ordenacao.coluna, config.ordenacao.direcao, tipoDado);
+    }
+    
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    const fim = inicio + itensPorPagina;
+    const dadosPagina = dadosOrdenados.slice(inicio, fim);
+    
+    const tbody = document.querySelector(`#table-${tipo} tbody`);
+    tbody.innerHTML = '';
+    
+    dadosPagina.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = config.renderLinha(item).map(html => `<td>${html}</td>`).join('');
+        tbody.appendChild(tr);
+    });
+    
+    atualizarInfoPaginacao(tipo, config.dadosFiltrados.length, paginaAtual, itensPorPagina);
 }
 
 function ordenarDados(dados, coluna, direcao, tipo) {
@@ -475,6 +563,18 @@ function ordenarDados(dados, coluna, direcao, tipo) {
         if (tipo === 'number') {
             valorA = parseFloat(valorA) || 0;
             valorB = parseFloat(valorB) || 0;
+        } else if (tipo === 'date') {
+            // Converter datas no formato DD/MM/YYYY para objeto Date
+            const parseData = (str) => {
+                if (!str) return new Date(0);
+                const partes = str.split('/');
+                if (partes.length === 3) {
+                    return new Date(partes[2], partes[1] - 1, partes[0]);
+                }
+                return new Date(str);
+            };
+            valorA = parseData(valorA);
+            valorB = parseData(valorB);
         } else {
             valorA = (valorA || '').toString().toLowerCase();
             valorB = (valorB || '').toString().toLowerCase();
@@ -486,107 +586,7 @@ function ordenarDados(dados, coluna, direcao, tipo) {
     });
 }
 
-function popularTabelaEmendas() {
-    const { paginaAtual, itensPorPagina } = paginacaoEmendas;
-    
-    // Aplicar ordenação se houver
-    let dadosOrdenados = dadosEmendasFiltrados;
-    if (ordenacaoEmendas.coluna) {
-        const th = document.querySelector(`#table-emendas th[data-column="${ordenacaoEmendas.coluna}"]`);
-        const tipo = th.getAttribute('data-type');
-        dadosOrdenados = ordenarDados(dadosEmendasFiltrados, ordenacaoEmendas.coluna, ordenacaoEmendas.direcao, tipo);
-    }
-    
-    const inicio = (paginaAtual - 1) * itensPorPagina;
-    const fim = inicio + itensPorPagina;
-    const dadosPagina = dadosOrdenados.slice(inicio, fim);
-    
-    const tbody = document.querySelector('#table-emendas tbody');
-    tbody.innerHTML = '';
-    
-    dadosPagina.forEach(emenda => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${emenda['Ano da Emenda'] || '-'}</td>
-            <td>${emenda['Nome do Autor da Emenda'] || '-'}</td>
-            <td>${emenda['Tipo de Emenda'] || '-'}</td>
-            <td>${emenda['Nome Função'] || '-'}</td>
-            <td>${emenda['Nome Subfunção'] || '-'}</td>
-            <td class="valor-monetario">${formatarMoeda(emenda['Valor Empenhado'])}</td>
-            <td class="valor-monetario">${formatarMoeda(emenda['Valor Pago'])}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-    
-    atualizarInfoPaginacao('emendas', dadosEmendasFiltrados.length, paginaAtual, itensPorPagina);
-}
 
-function popularTabelaConvenios() {
-    const { paginaAtual, itensPorPagina } = paginacaoConvenios;
-    
-    // Aplicar ordenação se houver
-    let dadosOrdenados = dadosConveniosFiltrados;
-    if (ordenacaoConvenios.coluna) {
-        const th = document.querySelector(`#table-convenios th[data-column="${ordenacaoConvenios.coluna}"]`);
-        const tipo = th.getAttribute('data-type');
-        dadosOrdenados = ordenarDados(dadosConveniosFiltrados, ordenacaoConvenios.coluna, ordenacaoConvenios.direcao, tipo);
-    }
-    
-    const inicio = (paginaAtual - 1) * itensPorPagina;
-    const fim = inicio + itensPorPagina;
-    const dadosPagina = dadosOrdenados.slice(inicio, fim);
-    
-    const tbody = document.querySelector('#table-convenios tbody');
-    tbody.innerHTML = '';
-    
-    dadosPagina.forEach(convenio => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${convenio['Data Publicação Convênio'] || '-'}</td>
-            <td>${convenio['Número Convênio'] || '-'}</td>
-            <td>${convenio['Convenente'] || '-'}</td>
-            <td>${convenio['Nome Função'] || '-'}</td>
-            <td class="valor-monetario">${formatarMoeda(convenio['Valor Convênio'])}</td>
-            <td>${(convenio['Objeto Convênio'] || '-').substring(0, 100)}...</td>
-        `;
-        tbody.appendChild(tr);
-    });
-    
-    atualizarInfoPaginacao('convenios', dadosConveniosFiltrados.length, paginaAtual, itensPorPagina);
-}
-
-function popularTabelaFavorecidos() {
-    const { paginaAtual, itensPorPagina } = paginacaoFavorecidos;
-    
-    // Aplicar ordenação se houver
-    let dadosOrdenados = dadosFavorecidosFiltrados;
-    if (ordenacaoFavorecidos.coluna) {
-        const th = document.querySelector(`#table-favorecidos th[data-column="${ordenacaoFavorecidos.coluna}"]`);
-        const tipo = th.getAttribute('data-type');
-        dadosOrdenados = ordenarDados(dadosFavorecidosFiltrados, ordenacaoFavorecidos.coluna, ordenacaoFavorecidos.direcao, tipo);
-    }
-    
-    const inicio = (paginaAtual - 1) * itensPorPagina;
-    const fim = inicio + itensPorPagina;
-    const dadosPagina = dadosOrdenados.slice(inicio, fim);
-    
-    const tbody = document.querySelector('#table-favorecidos tbody');
-    tbody.innerHTML = '';
-    
-    dadosPagina.forEach(favorecido => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${favorecido['Ano/Mês'] || '-'}</td>
-            <td>${favorecido['Favorecido'] || '-'}</td>
-            <td>${favorecido['Tipo Favorecido'] || '-'}</td>
-            <td>${favorecido['Nome do Autor da Emenda'] || '-'}</td>
-            <td class="valor-monetario">${formatarMoeda(favorecido['Valor Recebido'])}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-    
-    atualizarInfoPaginacao('favorecidos', dadosFavorecidosFiltrados.length, paginaAtual, itensPorPagina);
-}
 
 // Atualizar informações de paginação
 function atualizarInfoPaginacao(tipo, totalRegistros, paginaAtual, itensPorPagina) {
@@ -670,15 +670,15 @@ function configurarFiltros() {
         const funcao = filterFuncao.value;
         const ano = filterAno.value;
 
-        dadosEmendasFiltrados = dadosEmendas.filter(emenda => {
+        tabelasConfig.emendas.dadosFiltrados = dadosEmendas.filter(emenda => {
             const matchAutor = !autor || (emenda['Nome do Autor da Emenda'] || '').toLowerCase().includes(autor);
             const matchFuncao = !funcao || emenda['Nome Função'] === funcao;
             const matchAno = !ano || emenda['Ano da Emenda'] === ano;
             return matchAutor && matchFuncao && matchAno;
         });
 
-        paginacaoEmendas.paginaAtual = 1;
-        popularTabelaEmendas();
+        tabelasConfig.emendas.paginacao.paginaAtual = 1;
+        popularTabela('emendas');
     };
 
     filterAutor.addEventListener('input', filtrarEmendas);
@@ -693,14 +693,14 @@ function configurarFiltros() {
         const convenente = filterConvenente.value.toLowerCase();
         const funcao = filterFuncaoConvenios.value;
 
-        dadosConveniosFiltrados = dadosConvenios.filter(convenio => {
+        tabelasConfig.convenios.dadosFiltrados = dadosConvenios.filter(convenio => {
             const matchConvenente = !convenente || (convenio['Convenente'] || '').toLowerCase().includes(convenente);
             const matchFuncao = !funcao || convenio['Nome Função'] === funcao;
             return matchConvenente && matchFuncao;
         });
 
-        paginacaoConvenios.paginaAtual = 1;
-        popularTabelaConvenios();
+        tabelasConfig.convenios.paginacao.paginaAtual = 1;
+        popularTabela('convenios');
     };
 
     filterConvenente.addEventListener('input', filtrarConvenios);
@@ -716,15 +716,15 @@ function configurarFiltros() {
         const tipo = filterTipo.value;
         const autor = filterAutorFav.value;
 
-        dadosFavorecidosFiltrados = dadosFavorecidos.filter(favorecido => {
+        tabelasConfig.favorecidos.dadosFiltrados = dadosFavorecidos.filter(favorecido => {
             const matchNome = !nome || (favorecido['Favorecido'] || '').toLowerCase().includes(nome);
             const matchTipo = !tipo || favorecido['Tipo Favorecido'] === tipo;
             const matchAutor = !autor || favorecido['Nome do Autor da Emenda'] === autor;
             return matchNome && matchTipo && matchAutor;
         });
 
-        paginacaoFavorecidos.paginaAtual = 1;
-        popularTabelaFavorecidos();
+        tabelasConfig.favorecidos.paginacao.paginaAtual = 1;
+        popularTabela('favorecidos');
     };
 
     filterNome.addEventListener('input', filtrarFavorecidos);
@@ -736,101 +736,101 @@ function configurarFiltros() {
 function configurarPaginacao() {
     // Paginação Emendas
     document.getElementById('emendas-first').addEventListener('click', () => {
-        paginacaoEmendas.paginaAtual = 1;
-        popularTabelaEmendas();
+        tabelasConfig.emendas.paginacao.paginaAtual = 1;
+        popularTabela('emendas');
     });
     
     document.getElementById('emendas-prev').addEventListener('click', () => {
-        if (paginacaoEmendas.paginaAtual > 1) {
-            paginacaoEmendas.paginaAtual--;
-            popularTabelaEmendas();
+        if (tabelasConfig.emendas.paginacao.paginaAtual > 1) {
+            tabelasConfig.emendas.paginacao.paginaAtual--;
+            popularTabela('emendas');
         }
     });
     
     document.getElementById('emendas-next').addEventListener('click', () => {
-        const totalPaginas = Math.ceil(dadosEmendasFiltrados.length / paginacaoEmendas.itensPorPagina);
-        if (paginacaoEmendas.paginaAtual < totalPaginas) {
-            paginacaoEmendas.paginaAtual++;
-            popularTabelaEmendas();
+        const totalPaginas = Math.ceil(tabelasConfig.emendas.dadosFiltrados.length / tabelasConfig.emendas.paginacao.itensPorPagina);
+        if (tabelasConfig.emendas.paginacao.paginaAtual < totalPaginas) {
+            tabelasConfig.emendas.paginacao.paginaAtual++;
+            popularTabela('emendas');
         }
     });
     
     document.getElementById('emendas-last').addEventListener('click', () => {
-        const totalPaginas = Math.ceil(dadosEmendasFiltrados.length / paginacaoEmendas.itensPorPagina);
-        paginacaoEmendas.paginaAtual = totalPaginas;
-        popularTabelaEmendas();
+        const totalPaginas = Math.ceil(tabelasConfig.emendas.dadosFiltrados.length / tabelasConfig.emendas.paginacao.itensPorPagina);
+        tabelasConfig.emendas.paginacao.paginaAtual = totalPaginas;
+        popularTabela('emendas');
     });
     
     document.getElementById('emendas-per-page').addEventListener('change', (e) => {
-        paginacaoEmendas.itensPorPagina = parseInt(e.target.value);
-        paginacaoEmendas.paginaAtual = 1;
-        popularTabelaEmendas();
+        tabelasConfig.emendas.paginacao.itensPorPagina = parseInt(e.target.value);
+        tabelasConfig.emendas.paginacao.paginaAtual = 1;
+        popularTabela('emendas');
     });
 
     // Paginação Convênios
     document.getElementById('convenios-first').addEventListener('click', () => {
-        paginacaoConvenios.paginaAtual = 1;
-        popularTabelaConvenios();
+        tabelasConfig.convenios.paginacao.paginaAtual = 1;
+        popularTabela('convenios');
     });
     
     document.getElementById('convenios-prev').addEventListener('click', () => {
-        if (paginacaoConvenios.paginaAtual > 1) {
-            paginacaoConvenios.paginaAtual--;
-            popularTabelaConvenios();
+        if (tabelasConfig.convenios.paginacao.paginaAtual > 1) {
+            tabelasConfig.convenios.paginacao.paginaAtual--;
+            popularTabela('convenios');
         }
     });
     
     document.getElementById('convenios-next').addEventListener('click', () => {
-        const totalPaginas = Math.ceil(dadosConveniosFiltrados.length / paginacaoConvenios.itensPorPagina);
-        if (paginacaoConvenios.paginaAtual < totalPaginas) {
-            paginacaoConvenios.paginaAtual++;
-            popularTabelaConvenios();
+        const totalPaginas = Math.ceil(tabelasConfig.convenios.dadosFiltrados.length / tabelasConfig.convenios.paginacao.itensPorPagina);
+        if (tabelasConfig.convenios.paginacao.paginaAtual < totalPaginas) {
+            tabelasConfig.convenios.paginacao.paginaAtual++;
+            popularTabela('convenios');
         }
     });
     
     document.getElementById('convenios-last').addEventListener('click', () => {
-        const totalPaginas = Math.ceil(dadosConveniosFiltrados.length / paginacaoConvenios.itensPorPagina);
-        paginacaoConvenios.paginaAtual = totalPaginas;
-        popularTabelaConvenios();
+        const totalPaginas = Math.ceil(tabelasConfig.convenios.dadosFiltrados.length / tabelasConfig.convenios.paginacao.itensPorPagina);
+        tabelasConfig.convenios.paginacao.paginaAtual = totalPaginas;
+        popularTabela('convenios');
     });
     
     document.getElementById('convenios-per-page').addEventListener('change', (e) => {
-        paginacaoConvenios.itensPorPagina = parseInt(e.target.value);
-        paginacaoConvenios.paginaAtual = 1;
-        popularTabelaConvenios();
+        tabelasConfig.convenios.paginacao.itensPorPagina = parseInt(e.target.value);
+        tabelasConfig.convenios.paginacao.paginaAtual = 1;
+        popularTabela('convenios');
     });
 
     // Paginação Favorecidos
     document.getElementById('favorecidos-first').addEventListener('click', () => {
-        paginacaoFavorecidos.paginaAtual = 1;
-        popularTabelaFavorecidos();
+        tabelasConfig.favorecidos.paginacao.paginaAtual = 1;
+        popularTabela('favorecidos');
     });
     
     document.getElementById('favorecidos-prev').addEventListener('click', () => {
-        if (paginacaoFavorecidos.paginaAtual > 1) {
-            paginacaoFavorecidos.paginaAtual--;
-            popularTabelaFavorecidos();
+        if (tabelasConfig.favorecidos.paginacao.paginaAtual > 1) {
+            tabelasConfig.favorecidos.paginacao.paginaAtual--;
+            popularTabela('favorecidos');
         }
     });
     
     document.getElementById('favorecidos-next').addEventListener('click', () => {
-        const totalPaginas = Math.ceil(dadosFavorecidosFiltrados.length / paginacaoFavorecidos.itensPorPagina);
-        if (paginacaoFavorecidos.paginaAtual < totalPaginas) {
-            paginacaoFavorecidos.paginaAtual++;
-            popularTabelaFavorecidos();
+        const totalPaginas = Math.ceil(tabelasConfig.favorecidos.dadosFiltrados.length / tabelasConfig.favorecidos.paginacao.itensPorPagina);
+        if (tabelasConfig.favorecidos.paginacao.paginaAtual < totalPaginas) {
+            tabelasConfig.favorecidos.paginacao.paginaAtual++;
+            popularTabela('favorecidos');
         }
     });
     
     document.getElementById('favorecidos-last').addEventListener('click', () => {
-        const totalPaginas = Math.ceil(dadosFavorecidosFiltrados.length / paginacaoFavorecidos.itensPorPagina);
-        paginacaoFavorecidos.paginaAtual = totalPaginas;
-        popularTabelaFavorecidos();
+        const totalPaginas = Math.ceil(tabelasConfig.favorecidos.dadosFiltrados.length / tabelasConfig.favorecidos.paginacao.itensPorPagina);
+        tabelasConfig.favorecidos.paginacao.paginaAtual = totalPaginas;
+        popularTabela('favorecidos');
     });
     
     document.getElementById('favorecidos-per-page').addEventListener('change', (e) => {
-        paginacaoFavorecidos.itensPorPagina = parseInt(e.target.value);
-        paginacaoFavorecidos.paginaAtual = 1;
-        popularTabelaFavorecidos();
+        tabelasConfig.favorecidos.paginacao.itensPorPagina = parseInt(e.target.value);
+        tabelasConfig.favorecidos.paginacao.paginaAtual = 1;
+        popularTabela('favorecidos');
     });
 }
 
@@ -873,37 +873,46 @@ function configurarOrdenacao() {
 
     // Emendas
     document.querySelectorAll('#table-emendas th[data-column]').forEach(th => {
-        th.addEventListener('click', () => aplicarOrdenacao(th, ordenacaoEmendas, dadosEmendasFiltrados, popularTabelaEmendas));
+        th.addEventListener('click', () => aplicarOrdenacao(th, tabelasConfig.emendas.ordenacao, tabelasConfig.emendas.dadosFiltrados, () => popularTabela('emendas')));
     });
-    atualizarSortIcons(document.getElementById('table-emendas'), ordenacaoEmendas);
+    atualizarSortIcons(document.getElementById('table-emendas'), tabelasConfig.emendas.ordenacao);
 
     // Convênios
     document.querySelectorAll('#table-convenios th[data-column]').forEach(th => {
-        th.addEventListener('click', () => aplicarOrdenacao(th, ordenacaoConvenios, dadosConveniosFiltrados, popularTabelaConvenios));
+        th.addEventListener('click', () => aplicarOrdenacao(th, tabelasConfig.convenios.ordenacao, tabelasConfig.convenios.dadosFiltrados, () => popularTabela('convenios')));
     });
-    atualizarSortIcons(document.getElementById('table-convenios'), ordenacaoConvenios);
+    atualizarSortIcons(document.getElementById('table-convenios'), tabelasConfig.convenios.ordenacao);
 
     // Favorecidos
     document.querySelectorAll('#table-favorecidos th[data-column]').forEach(th => {
-        th.addEventListener('click', () => aplicarOrdenacao(th, ordenacaoFavorecidos, dadosFavorecidosFiltrados, popularTabelaFavorecidos));
+        th.addEventListener('click', () => aplicarOrdenacao(th, tabelasConfig.favorecidos.ordenacao, tabelasConfig.favorecidos.dadosFiltrados, () => popularTabela('favorecidos')));
     });
-    atualizarSortIcons(document.getElementById('table-favorecidos'), ordenacaoFavorecidos);
+    atualizarSortIcons(document.getElementById('table-favorecidos'), tabelasConfig.favorecidos.ordenacao);
 }
 
 // -------- Interatividade Adicional --------
 // Reset Filtros
 function adicionarResetFiltros() {
     const configs = [
-        { btn: '#reset-emendas', filtros: ['#filter-emendas-autor','#filter-emendas-funcao','#filter-emendas-ano'], dadosOrig: dadosEmendas, setFiltrado: () => { dadosEmendasFiltrados = [...dadosEmendas]; popularTabelaEmendas(); } },
-        { btn: '#reset-convenios', filtros: ['#filter-convenios-convenente','#filter-convenios-funcao'], dadosOrig: dadosConvenios, setFiltrado: () => { dadosConveniosFiltrados = [...dadosConvenios]; popularTabelaConvenios(); } },
-        { btn: '#reset-favorecidos', filtros: ['#filter-favorecidos-nome','#filter-favorecidos-tipo','#filter-favorecidos-autor'], dadosOrig: dadosFavorecidos, setFiltrado: () => { dadosFavorecidosFiltrados = [...dadosFavorecidos]; popularTabelaFavorecidos(); } }
+        { btn: '#reset-emendas', filtros: ['#filter-emendas-autor','#filter-emendas-funcao','#filter-emendas-ano'], tipo: 'emendas' },
+        { btn: '#reset-convenios', filtros: ['#filter-convenios-convenente','#filter-convenios-funcao'], tipo: 'convenios' },
+        { btn: '#reset-favorecidos', filtros: ['#filter-favorecidos-nome','#filter-favorecidos-tipo','#filter-favorecidos-autor'], tipo: 'favorecidos' }
     ];
     configs.forEach(cfg => {
         const btn = document.querySelector(cfg.btn);
         if (btn) {
             btn.addEventListener('click', () => {
-                cfg.filtros.forEach(sel => { const el = document.querySelector(sel); if (el) el.value=''; });
-                cfg.setFiltrado();
+                cfg.filtros.forEach(sel => { 
+                    const el = document.querySelector(sel); 
+                    if (el) el.value = ''; 
+                });
+                // Restaurar dados originais
+                const dadosOriginais = cfg.tipo === 'emendas' ? dadosEmendas : 
+                                      cfg.tipo === 'convenios' ? dadosConvenios : 
+                                      dadosFavorecidos;
+                tabelasConfig[cfg.tipo].dadosFiltrados = [...dadosOriginais];
+                tabelasConfig[cfg.tipo].paginacao.paginaAtual = 1;
+                popularTabela(cfg.tipo);
             });
         }
     });
@@ -917,17 +926,17 @@ function configurarBuscaGlobal() {
         const termo = input.value.toLowerCase();
         // Restaurar se vazio
         if (!termo) {
-            dadosEmendasFiltrados = [...dadosEmendas];
-            dadosConveniosFiltrados = [...dadosConvenios];
-            dadosFavorecidosFiltrados = [...dadosFavorecidos];
+            tabelasConfig.emendas.dadosFiltrados = [...dadosEmendas];
+            tabelasConfig.convenios.dadosFiltrados = [...dadosConvenios];
+            tabelasConfig.favorecidos.dadosFiltrados = [...dadosFavorecidos];
             popularTabelas();
             return;
         }
         const filtrarObjeto = (arr, campos) => arr.filter(obj => campos.some(c => (obj[c]||'').toString().toLowerCase().includes(termo)));
-        dadosEmendasFiltrados = filtrarObjeto(dadosEmendas,[ 'Nome do Autor da Emenda','Tipo de Emenda','Nome Função','Nome Subfunção']);
-        dadosConveniosFiltrados = filtrarObjeto(dadosConvenios,['Convenente','Nome Função','Objeto Convênio']);
-        dadosFavorecidosFiltrados = filtrarObjeto(dadosFavorecidos,['Favorecido','Tipo Favorecido','Nome do Autor da Emenda']);
-        paginacaoEmendas.paginaAtual=1; paginacaoConvenios.paginaAtual=1; paginacaoFavorecidos.paginaAtual=1;
+        tabelasConfig.emendas.dadosFiltrados = filtrarObjeto(dadosEmendas,[ 'Nome do Autor da Emenda','Tipo de Emenda','Nome Função','Nome Subfunção']);
+        tabelasConfig.convenios.dadosFiltrados = filtrarObjeto(dadosConvenios,['Convenente','Nome Função','Objeto Convênio']);
+        tabelasConfig.favorecidos.dadosFiltrados = filtrarObjeto(dadosFavorecidos,['Favorecido','Tipo Favorecido','Nome do Autor da Emenda']);
+        tabelasConfig.emendas.paginacao.paginaAtual=1; tabelasConfig.convenios.paginacao.paginaAtual=1; tabelasConfig.favorecidos.paginacao.paginaAtual=1;
         popularTabelas();
     });
 }

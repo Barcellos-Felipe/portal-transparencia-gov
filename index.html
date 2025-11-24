@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emendas Parlamentares - Campo Grande/MS</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Emendas Parlamentares</h1>
+            <p class="subtitle">Campo Grande, Mato Grosso do Sul</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Seção Explicativa -->
+        <section class="info-section">
+            <h2>O que são Emendas Parlamentares?</h2>
+            <div class="info-content">
+                <p>
+                    Emendas parlamentares são instrumentos que permitem aos deputados federais e senadores 
+                    destinarem recursos do orçamento da União para projetos e ações específicas em seus 
+                    estados e municípios.
+                </p>
+                <p>
+                    Por meio dessas emendas, os parlamentares podem direcionar investimentos para áreas como 
+                    saúde, educação, infraestrutura, agricultura e outras necessidades locais, complementando 
+                    as ações do poder público.
+                </p>
+                <h3>O que esta página apresenta?</h3>
+                <p>
+                    Este painel apresenta de forma transparente e acessível todas as emendas parlamentares 
+                    destinadas a Campo Grande/MS. Você pode explorar:
+                </p>
+                <ul>
+                    <li>Valores totais empenhados, liquidados e pagos</li>
+                    <li>Distribuição por área de atuação (saúde, educação, infraestrutura, etc.)</li>
+                    <li>Parlamentares autores das emendas</li>
+                    <li>Instituições e entidades favorecidas</li>
+                    <li>Convênios firmados para execução das emendas</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Indicadores Principais -->
+        <section class="indicators-section">
+            <h2>Indicadores Gerais</h2>
+            <div class="indicators-grid">
+                <div class="indicator-card">
+                    <div class="indicator-value" id="total-empenhado">R$ 0,00</div>
+                    <div class="indicator-label">Total Empenhado</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="indicator-value" id="total-liquidado">R$ 0,00</div>
+                    <div class="indicator-label">Total Liquidado</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="indicator-value" id="total-pago">R$ 0,00</div>
+                    <div class="indicator-label">Total Pago</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="indicator-value" id="total-emendas">0</div>
+                    <div class="indicator-label">Total de Emendas</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="indicator-value" id="total-convenios">0</div>
+                    <div class="indicator-label">Convênios Firmados</div>
+                </div>
+                <div class="indicator-card">
+                    <div class="indicator-value" id="total-favorecidos">0</div>
+                    <div class="indicator-label">Favorecidos Únicos</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Gráficos -->
+        <section class="charts-section">
+            <h2>Visualizações</h2>
+            
+            <div class="chart-row">
+                <div class="chart-container">
+                    <h3>Distribuição por Função</h3>
+                    <canvas id="funcaoChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Valores por Ano</h3>
+                    <canvas id="anoChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-row">
+                <div class="chart-container">
+                    <h3>Top 10 Parlamentares por Valor</h3>
+                    <canvas id="parlamentaresChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Tipo de Emenda</h3>
+                    <canvas id="tipoEmendaChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-row">
+                <div class="chart-container chart-full-width">
+                    <h3>Top 10 Favorecidos por Valor Recebido</h3>
+                    <canvas id="favorecidosChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tabelas com Filtros -->
+        <section class="tables-section">
+            <h2>Dados Detalhados</h2>
+            
+            <!-- Emendas -->
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>Emendas Parlamentares</h3>
+                    <div class="filters">
+                        <input type="text" id="filter-emendas-autor" placeholder="Filtrar por autor..." class="filter-input">
+                        <select id="filter-emendas-funcao" class="filter-select">
+                            <option value="">Todas as funções</option>
+                        </select>
+                        <select id="filter-emendas-ano" class="filter-select">
+                            <option value="">Todos os anos</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table id="table-emendas">
+                        <thead>
+                            <tr>
+                                <th data-column="Ano da Emenda" data-type="text">
+                                    Ano <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Nome do Autor da Emenda" data-type="text">
+                                    Autor <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Tipo de Emenda" data-type="text">
+                                    Tipo <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Nome Função" data-type="text">
+                                    Função <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Nome Subfunção" data-type="text">
+                                    Subfunção <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Valor Empenhado" data-type="number">
+                                    Valor Empenhado <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Valor Pago" data-type="number">
+                                    Valor Pago <span class="sort-icon">⇅</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        Mostrando <span id="emendas-range">0</span> de <span id="emendas-total">0</span> registros
+                    </div>
+                    <div class="pagination-controls">
+                        <button class="pagination-btn" id="emendas-first" title="Primeira página">«</button>
+                        <button class="pagination-btn" id="emendas-prev" title="Página anterior">‹</button>
+                        <span class="pagination-page">Página <span id="emendas-current-page">1</span> de <span id="emendas-total-pages">1</span></span>
+                        <button class="pagination-btn" id="emendas-next" title="Próxima página">›</button>
+                        <button class="pagination-btn" id="emendas-last" title="Última página">»</button>
+                    </div>
+                    <select id="emendas-per-page" class="per-page-select">
+                        <option value="10" selected>10 por página</option>
+                        <option value="25">25 por página</option>
+                        <option value="50">50 por página</option>
+                        <option value="100">100 por página</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Convênios -->
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>Convênios</h3>
+                    <div class="filters">
+                        <input type="text" id="filter-convenios-convenente" placeholder="Filtrar por convenente..." class="filter-input">
+                        <select id="filter-convenios-funcao" class="filter-select">
+                            <option value="">Todas as funções</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table id="table-convenios">
+                        <thead>
+                            <tr>
+                                <th data-column="Data Publicação Convênio" data-type="text">
+                                    Data Publicação <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Número Convênio" data-type="text">
+                                    Número <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Convenente" data-type="text">
+                                    Convenente <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Nome Função" data-type="text">
+                                    Função <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Valor Convênio" data-type="number">
+                                    Valor <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Objeto Convênio" data-type="text">
+                                    Objeto <span class="sort-icon">⇅</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        Mostrando <span id="convenios-range">0</span> de <span id="convenios-total">0</span> registros
+                    </div>
+                    <div class="pagination-controls">
+                        <button class="pagination-btn" id="convenios-first" title="Primeira página">«</button>
+                        <button class="pagination-btn" id="convenios-prev" title="Página anterior">‹</button>
+                        <span class="pagination-page">Página <span id="convenios-current-page">1</span> de <span id="convenios-total-pages">1</span></span>
+                        <button class="pagination-btn" id="convenios-next" title="Próxima página">›</button>
+                        <button class="pagination-btn" id="convenios-last" title="Última página">»</button>
+                    </div>
+                    <select id="convenios-per-page" class="per-page-select">
+                        <option value="10" selected>10 por página</option>
+                        <option value="25">25 por página</option>
+                        <option value="50">50 por página</option>
+                        <option value="100">100 por página</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Favorecidos -->
+            <div class="table-card">
+                <div class="table-header">
+                    <h3>Valores por Favorecido</h3>
+                    <div class="filters">
+                        <input type="text" id="filter-favorecidos-nome" placeholder="Filtrar por nome..." class="filter-input">
+                        <select id="filter-favorecidos-tipo" class="filter-select">
+                            <option value="">Todos os tipos</option>
+                        </select>
+                        <select id="filter-favorecidos-autor" class="filter-select">
+                            <option value="">Todos os autores</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table id="table-favorecidos">
+                        <thead>
+                            <tr>
+                                <th data-column="Ano/Mês" data-type="text">
+                                    Ano/Mês <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Favorecido" data-type="text">
+                                    Favorecido <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Tipo Favorecido" data-type="text">
+                                    Tipo <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Nome do Autor da Emenda" data-type="text">
+                                    Autor da Emenda <span class="sort-icon">⇅</span>
+                                </th>
+                                <th data-column="Valor Recebido" data-type="number">
+                                    Valor Recebido <span class="sort-icon">⇅</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        Mostrando <span id="favorecidos-range">0</span> de <span id="favorecidos-total">0</span> registros
+                    </div>
+                    <div class="pagination-controls">
+                        <button class="pagination-btn" id="favorecidos-first" title="Primeira página">«</button>
+                        <button class="pagination-btn" id="favorecidos-prev" title="Página anterior">‹</button>
+                        <span class="pagination-page">Página <span id="favorecidos-current-page">1</span> de <span id="favorecidos-total-pages">1</span></span>
+                        <button class="pagination-btn" id="favorecidos-next" title="Próxima página">›</button>
+                        <button class="pagination-btn" id="favorecidos-last" title="Última página">»</button>
+                    </div>
+                    <select id="favorecidos-per-page" class="per-page-select">
+                        <option value="10" selected>10 por página</option>
+                        <option value="25">25 por página</option>
+                        <option value="50">50 por página</option>
+                        <option value="100">100 por página</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Dados obtidos do Portal da Transparência do Governo Federal</p>
+            <p>Última atualização: <span id="last-update"></span></p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

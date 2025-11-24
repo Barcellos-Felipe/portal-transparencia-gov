@@ -305,6 +305,7 @@ thead th {
     user-select: none;
     position: relative;
     transition: background-color 0.2s ease;
+    white-space: nowrap;
 }
 
 thead th:hover {

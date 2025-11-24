@@ -49,27 +49,27 @@
         <section class="indicators-section">
             <h2>Indicadores Gerais</h2>
             <div class="indicators-grid">
-                <div class="indicator-card">
+                <div class="indicator-card" title="Total de valores empenhados (reservados no orçamento)">
                     <div class="indicator-value" id="total-empenhado">R$ 0,00</div>
                     <div class="indicator-label">Total Empenhado</div>
                 </div>
-                <div class="indicator-card">
+                <div class="indicator-card" title="Total de valores liquidados (serviço ou produto confirmado)">
                     <div class="indicator-value" id="total-liquidado">R$ 0,00</div>
                     <div class="indicator-label">Total Liquidado</div>
                 </div>
-                <div class="indicator-card">
+                <div class="indicator-card" title="Total efetivamente pago">
                     <div class="indicator-value" id="total-pago">R$ 0,00</div>
                     <div class="indicator-label">Total Pago</div>
                 </div>
-                <div class="indicator-card">
+                <div class="indicator-card" title="Quantidade de emendas registradas">
                     <div class="indicator-value" id="total-emendas">0</div>
                     <div class="indicator-label">Total de Emendas</div>
                 </div>
-                <div class="indicator-card">
+                <div class="indicator-card" title="Convênios firmados para execução das emendas">
                     <div class="indicator-value" id="total-convenios">0</div>
                     <div class="indicator-label">Convênios Firmados</div>
                 </div>
-                <div class="indicator-card">
+                <div class="indicator-card" title="Número de entidades/beneficiários únicos">
                     <div class="indicator-value" id="total-favorecidos">0</div>
                     <div class="indicator-label">Favorecidos Únicos</div>
                 </div>
@@ -113,6 +113,9 @@
         <!-- Tabelas com Filtros -->
         <section class="tables-section">
             <h2>Dados Detalhados</h2>
+            <div class="global-search-wrapper">
+                <input type="text" id="global-search" class="filter-input" placeholder="Busca rápida (autor, favorecido, função...)" aria-label="Busca rápida global">
+            </div>
             
             <!-- Emendas -->
             <div class="table-card">
@@ -126,6 +129,7 @@
                         <select id="filter-emendas-ano" class="filter-select">
                             <option value="">Todos os anos</option>
                         </select>
+                        <button type="button" id="reset-emendas" class="reset-btn" title="Limpar filtros desta tabela">Reset</button>
                     </div>
                 </div>
                 <div class="table-wrapper">
@@ -187,6 +191,7 @@
                         <select id="filter-convenios-funcao" class="filter-select">
                             <option value="">Todas as funções</option>
                         </select>
+                        <button type="button" id="reset-convenios" class="reset-btn" title="Limpar filtros desta tabela">Reset</button>
                     </div>
                 </div>
                 <div class="table-wrapper">
@@ -248,6 +253,7 @@
                         <select id="filter-favorecidos-autor" class="filter-select">
                             <option value="">Todos os autores</option>
                         </select>
+                        <button type="button" id="reset-favorecidos" class="reset-btn" title="Limpar filtros desta tabela">Reset</button>
                     </div>
                 </div>
                 <div class="table-wrapper">

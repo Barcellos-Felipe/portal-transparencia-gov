@@ -78,6 +78,8 @@ function inicializarDashboard() {
     configurarPaginacao();
     configurarOrdenacao();
     atualizarDataAtualizacao();
+    // Interações adicionais e melhorias de usabilidade
+    inicializarInteracoesExtras();
 }
 
 // Atualizar Indicadores
@@ -834,74 +836,165 @@ function configurarPaginacao() {
 
 // Configurar Ordenação
 function configurarOrdenacao() {
-    // Ordenação Emendas
+    const aplicarOrdenacao = (th, stateObj, dadosFiltradosRef, popularFunc) => {
+        const coluna = th.getAttribute('data-column');
+        const tipo = th.getAttribute('data-type');
+        // Alternar direção
+        if (stateObj.coluna === coluna) {
+            stateObj.direcao = stateObj.direcao === 'asc' ? 'desc' : 'asc';
+        } else {
+            stateObj.coluna = coluna;
+            stateObj.direcao = 'asc';
+        }
+        popularFunc();
+        atualizarSortIcons(th.closest('table'), stateObj);
+    };
+
+    const atualizarSortIcons = (table, stateObj) => {
+        table.querySelectorAll('th[data-column]').forEach(th => {
+            const iconSpan = th.querySelector('.sort-icon');
+            th.classList.remove('sort-asc','sort-desc');
+            iconSpan.textContent = '⇅';
+            iconSpan.setAttribute('aria-label','Ordenar');
+            const coluna = th.getAttribute('data-column');
+            if (stateObj.coluna === coluna) {
+                if (stateObj.direcao === 'asc') {
+                    th.classList.add('sort-asc');
+                    iconSpan.textContent = '↑';
+                    iconSpan.setAttribute('aria-label','Ordenado ascendente');
+                } else {
+                    th.classList.add('sort-desc');
+                    iconSpan.textContent = '↓';
+                    iconSpan.setAttribute('aria-label','Ordenado descendente');
+                }
+            }
+        });
+    };
+
+    // Emendas
     document.querySelectorAll('#table-emendas th[data-column]').forEach(th => {
-        th.addEventListener('click', () => {
-            const coluna = th.getAttribute('data-column');
-            
-            // Atualizar direção
-            if (ordenacaoEmendas.coluna === coluna) {
-                ordenacaoEmendas.direcao = ordenacaoEmendas.direcao === 'asc' ? 'desc' : 'asc';
-            } else {
-                ordenacaoEmendas.coluna = coluna;
-                ordenacaoEmendas.direcao = 'asc';
-            }
-            
-            // Atualizar classes visuais
-            document.querySelectorAll('#table-emendas th').forEach(header => {
-                header.classList.remove('sort-asc', 'sort-desc');
-            });
-            th.classList.add(ordenacaoEmendas.direcao === 'asc' ? 'sort-asc' : 'sort-desc');
-            
-            // Reordenar e exibir
-            paginacaoEmendas.paginaAtual = 1;
-            popularTabelaEmendas();
-        });
+        th.addEventListener('click', () => aplicarOrdenacao(th, ordenacaoEmendas, dadosEmendasFiltrados, popularTabelaEmendas));
     });
+    atualizarSortIcons(document.getElementById('table-emendas'), ordenacaoEmendas);
 
-    // Ordenação Convênios
+    // Convênios
     document.querySelectorAll('#table-convenios th[data-column]').forEach(th => {
-        th.addEventListener('click', () => {
-            const coluna = th.getAttribute('data-column');
-            
-            if (ordenacaoConvenios.coluna === coluna) {
-                ordenacaoConvenios.direcao = ordenacaoConvenios.direcao === 'asc' ? 'desc' : 'asc';
-            } else {
-                ordenacaoConvenios.coluna = coluna;
-                ordenacaoConvenios.direcao = 'asc';
-            }
-            
-            document.querySelectorAll('#table-convenios th').forEach(header => {
-                header.classList.remove('sort-asc', 'sort-desc');
-            });
-            th.classList.add(ordenacaoConvenios.direcao === 'asc' ? 'sort-asc' : 'sort-desc');
-            
-            paginacaoConvenios.paginaAtual = 1;
-            popularTabelaConvenios();
-        });
+        th.addEventListener('click', () => aplicarOrdenacao(th, ordenacaoConvenios, dadosConveniosFiltrados, popularTabelaConvenios));
     });
+    atualizarSortIcons(document.getElementById('table-convenios'), ordenacaoConvenios);
 
-    // Ordenação Favorecidos
+    // Favorecidos
     document.querySelectorAll('#table-favorecidos th[data-column]').forEach(th => {
-        th.addEventListener('click', () => {
-            const coluna = th.getAttribute('data-column');
-            
-            if (ordenacaoFavorecidos.coluna === coluna) {
-                ordenacaoFavorecidos.direcao = ordenacaoFavorecidos.direcao === 'asc' ? 'desc' : 'asc';
-            } else {
-                ordenacaoFavorecidos.coluna = coluna;
-                ordenacaoFavorecidos.direcao = 'asc';
-            }
-            
-            document.querySelectorAll('#table-favorecidos th').forEach(header => {
-                header.classList.remove('sort-asc', 'sort-desc');
+        th.addEventListener('click', () => aplicarOrdenacao(th, ordenacaoFavorecidos, dadosFavorecidosFiltrados, popularTabelaFavorecidos));
+    });
+    atualizarSortIcons(document.getElementById('table-favorecidos'), ordenacaoFavorecidos);
+}
+
+// -------- Interatividade Adicional --------
+// Reset Filtros
+function adicionarResetFiltros() {
+    const configs = [
+        { btn: '#reset-emendas', filtros: ['#filter-emendas-autor','#filter-emendas-funcao','#filter-emendas-ano'], dadosOrig: dadosEmendas, setFiltrado: () => { dadosEmendasFiltrados = [...dadosEmendas]; popularTabelaEmendas(); } },
+        { btn: '#reset-convenios', filtros: ['#filter-convenios-convenente','#filter-convenios-funcao'], dadosOrig: dadosConvenios, setFiltrado: () => { dadosConveniosFiltrados = [...dadosConvenios]; popularTabelaConvenios(); } },
+        { btn: '#reset-favorecidos', filtros: ['#filter-favorecidos-nome','#filter-favorecidos-tipo','#filter-favorecidos-autor'], dadosOrig: dadosFavorecidos, setFiltrado: () => { dadosFavorecidosFiltrados = [...dadosFavorecidos]; popularTabelaFavorecidos(); } }
+    ];
+    configs.forEach(cfg => {
+        const btn = document.querySelector(cfg.btn);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                cfg.filtros.forEach(sel => { const el = document.querySelector(sel); if (el) el.value=''; });
+                cfg.setFiltrado();
             });
-            th.classList.add(ordenacaoFavorecidos.direcao === 'asc' ? 'sort-asc' : 'sort-desc');
-            
-            paginacaoFavorecidos.paginaAtual = 1;
-            popularTabelaFavorecidos();
+        }
+    });
+}
+
+// Global Search
+function configurarBuscaGlobal() {
+    const input = document.getElementById('global-search');
+    if (!input) return;
+    input.addEventListener('input', () => {
+        const termo = input.value.toLowerCase();
+        // Restaurar se vazio
+        if (!termo) {
+            dadosEmendasFiltrados = [...dadosEmendas];
+            dadosConveniosFiltrados = [...dadosConvenios];
+            dadosFavorecidosFiltrados = [...dadosFavorecidos];
+            popularTabelas();
+            return;
+        }
+        const filtrarObjeto = (arr, campos) => arr.filter(obj => campos.some(c => (obj[c]||'').toString().toLowerCase().includes(termo)));
+        dadosEmendasFiltrados = filtrarObjeto(dadosEmendas,[ 'Nome do Autor da Emenda','Tipo de Emenda','Nome Função','Nome Subfunção']);
+        dadosConveniosFiltrados = filtrarObjeto(dadosConvenios,['Convenente','Nome Função','Objeto Convênio']);
+        dadosFavorecidosFiltrados = filtrarObjeto(dadosFavorecidos,['Favorecido','Tipo Favorecido','Nome do Autor da Emenda']);
+        paginacaoEmendas.paginaAtual=1; paginacaoConvenios.paginaAtual=1; paginacaoFavorecidos.paginaAtual=1;
+        popularTabelas();
+    });
+}
+
+// Row click highlight
+function ativarClickLinhas() {
+    ['#table-emendas','#table-convenios','#table-favorecidos'].forEach(sel => {
+        const tbody = document.querySelector(sel+' tbody');
+        if (!tbody) return;
+        tbody.addEventListener('click', (e) => {
+            const tr = e.target.closest('tr');
+            if (!tr) return;
+            tr.classList.toggle('row-active');
         });
     });
+}
+
+// Chart enhancements (center text for doughnut)
+const centerTextPlugin = {
+    id: 'centerText',
+    afterDraw(chart) {
+        if (chart.config.type !== 'doughnut') return;
+        const meta = chart.getDatasetMeta(0);
+        if (!meta || !meta.data || !meta.data[0]) return;
+        const { ctx } = chart;
+        const { x, y } = meta.data[0];
+        const total = chart.data.datasets[0].data.reduce((a,b)=>a+b,0);
+        ctx.save();
+        ctx.font = (window.innerWidth < 768 ? '12px' : '14px') + ' sans-serif';
+        ctx.fillStyle = '#2c3e50';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(formatarMoeda(total), x, y);
+        ctx.restore();
+    }
+};
+
+// Override criarGraficoTipoEmenda to include plugin if not already added
+// We append plugin registration after all charts creation
+
+// Indicators click scroll
+function configurarIndicadoresInterativos() {
+    document.querySelectorAll('.indicator-card').forEach(card => {
+        card.style.cursor='pointer';
+        card.addEventListener('click', () => {
+            document.querySelector('.charts-section')?.scrollIntoView({behavior:'smooth'});
+        });
+    });
+}
+
+// Inicialização extra após dashboard
+function inicializarInteracoesExtras() {
+    adicionarResetFiltros();
+    configurarBuscaGlobal();
+    ativarClickLinhas();
+    configurarIndicadoresInterativos();
+    // Registrar plugin global para doughnut center text
+    // Chart.js v4: avoid deprecated/unsupported getPlugin; safely register once
+    try {
+        const already = Chart.registry?.plugins?.some(p => p.id === 'centerText');
+        if (!already) {
+            Chart.register(centerTextPlugin);
+        }
+    } catch (e) {
+        // Fallback: attempt direct register; duplicate register is benign
+        Chart.register(centerTextPlugin);
+    }
 }
 
 // Atualizar Data de Atualização

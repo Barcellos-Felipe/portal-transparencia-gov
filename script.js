@@ -26,21 +26,29 @@ const formatarMoeda = (valor) => {
     const num = parseFloat(valor) || 0;
     return new Intl.NumberFormat('pt-BR', {
         style: 'currency',
-        currency: 'BRL'
+        currency: 'BRL',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
     }).format(num);
 };
 
 const formatarNumero = (valor) => {
-    return new Intl.NumberFormat('pt-BR').format(valor);
+    return new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(valor);
 };
 
 // Carregar dados
 async function carregarDados() {
     try {
         const [resEmendas, resConvenios, resFavorecidos] = await Promise.all([
-            fetch('https://portal-transparencia-gov.onrender.com/api/data/emendas'),
-            fetch('https://portal-transparencia-gov.onrender.com/api/data/convenios'),
-            fetch('https://portal-transparencia-gov.onrender.com/api/data/por_favorecido')
+            // fetch('https://portal-transparencia-gov.onrender.com/api/data/emendas'),
+            // fetch('https://portal-transparencia-gov.onrender.com/api/data/convenios'),
+            // fetch('https://portal-transparencia-gov.onrender.com/api/data/por_favorecido')
+            fetch('../data/emendas_web.json'),
+            fetch('../data/emendas_convenios_web.json'),
+            fetch('../data/emendas_por_favorecido_web.json')
         ]);
 
         dadosEmendas = await resEmendas.json();
@@ -135,7 +143,7 @@ function criarGraficoFuncao() {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     display: false
@@ -152,7 +160,19 @@ function criarGraficoFuncao() {
                     ticks: {
                         callback: (value) => {
                             return 'R$ ' + (value / 1000000).toFixed(1) + 'M';
+                        },
+                        font: {
+                            size: window.innerWidth < 768 ? 10 : 12
                         }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: window.innerWidth < 768 ? 9 : 11
+                        },
+                        maxRotation: window.innerWidth < 768 ? 45 : 0,
+                        minRotation: window.innerWidth < 768 ? 45 : 0
                     }
                 }
             }
@@ -205,8 +225,15 @@ function criarGraficoAno() {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
+                legend: {
+                    labels: {
+                        font: {
+                            size: window.innerWidth < 768 ? 10 : 12
+                        }
+                    }
+                },
                 tooltip: {
                     callbacks: {
                         label: (context) => {
@@ -221,6 +248,16 @@ function criarGraficoAno() {
                     ticks: {
                         callback: (value) => {
                             return 'R$ ' + (value / 1000000).toFixed(1) + 'M';
+                        },
+                        font: {
+                            size: window.innerWidth < 768 ? 10 : 12
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: window.innerWidth < 768 ? 10 : 11
                         }
                     }
                 }
@@ -258,7 +295,7 @@ function criarGraficoParlamentares() {
         options: {
             indexAxis: 'y',
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     display: false
@@ -275,6 +312,16 @@ function criarGraficoParlamentares() {
                     ticks: {
                         callback: (value) => {
                             return 'R$ ' + (value / 1000000).toFixed(1) + 'M';
+                        },
+                        font: {
+                            size: window.innerWidth < 768 ? 9 : 11
+                        }
+                    }
+                },
+                y: {
+                    ticks: {
+                        font: {
+                            size: window.innerWidth < 768 ? 9 : 11
                         }
                     }
                 }
@@ -315,8 +362,17 @@ function criarGraficoTipoEmenda() {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
+                legend: {
+                    position: window.innerWidth < 768 ? 'bottom' : 'right',
+                    labels: {
+                        font: {
+                            size: window.innerWidth < 768 ? 9 : 11
+                        },
+                        padding: window.innerWidth < 768 ? 8 : 10
+                    }
+                },
                 tooltip: {
                     callbacks: {
                         label: (context) => {
@@ -345,10 +401,13 @@ function criarGraficoFavorecidos() {
         .slice(0, 10);
 
     const ctx = document.getElementById('favorecidosChart').getContext('2d');
+    const isMobile = window.innerWidth < 768;
+    const maxLength = isMobile ? 25 : 40;
+    
     favorecidosChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: dados.map(d => d[0].length > 40 ? d[0].substring(0, 40) + '...' : d[0]),
+            labels: dados.map(d => d[0].length > maxLength ? d[0].substring(0, maxLength) + '...' : d[0]),
             datasets: [{
                 label: 'Valor Recebido',
                 data: dados.map(d => d[1]),
@@ -360,7 +419,7 @@ function criarGraficoFavorecidos() {
         options: {
             indexAxis: 'y',
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: {
                     display: false
@@ -381,6 +440,16 @@ function criarGraficoFavorecidos() {
                     ticks: {
                         callback: (value) => {
                             return 'R$ ' + (value / 1000000).toFixed(1) + 'M';
+                        },
+                        font: {
+                            size: isMobile ? 9 : 11
+                        }
+                    }
+                },
+                y: {
+                    ticks: {
+                        font: {
+                            size: isMobile ? 8 : 10
                         }
                     }
                 }

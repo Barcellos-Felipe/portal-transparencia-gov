@@ -106,9 +106,17 @@ section h3 {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 1.5rem;
     margin-top: 1.5rem;
+    max-width: 100%;
+}
+
+@media (min-width: 769px) {
+    .indicators-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, calc(33.333% - 1rem)));
+    }
 }
 
 .indicator-card {
+    min-width: 220px;
     background: var(--white);
     padding: 2rem 1.5rem;
     border-radius: 12px;
@@ -144,9 +152,16 @@ section h3 {
 
 .chart-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 2rem;
     margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+    .chart-row {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
 }
 
 .chart-container {
@@ -167,6 +182,8 @@ section h3 {
 
 .chart-container canvas {
     max-height: 350px;
+    width: 100% !important;
+    height: auto !important;
 }
 
 /* Tabelas */
@@ -228,6 +245,8 @@ section h3 {
 /* Tabela */
 .table-wrapper {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
 }
 
 table {
@@ -401,61 +420,268 @@ footer p {
     .chart-row {
         grid-template-columns: 1fr;
     }
+    
+    .chart-container {
+        padding: 1.5rem;
+    }
 }
 
 @media (max-width: 768px) {
+    header {
+        padding: 1.5rem 0;
+    }
+
     header h1 {
-        font-size: 2rem;
+        font-size: 1.75rem;
+    }
+
+    header .subtitle {
+        font-size: 1rem;
     }
 
     .container {
         padding: 0 1rem;
     }
 
+    section {
+        margin: 1.5rem 0;
+    }
+
+    section h2 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
     .indicators-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        grid-template-columns: 1fr;
         gap: 1rem;
     }
 
+    .indicator-card {
+        min-width: unset;
+        padding: 1.5rem 1rem;
+    }
+
     .indicator-value {
-        font-size: 1.5rem;
+        font-size: 1.75rem;
+    }
+
+    .indicator-label {
+        font-size: 0.85rem;
     }
 
     .chart-row {
         grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .chart-container {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .chart-container h3 {
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .chart-container canvas {
+        max-height: 280px !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+
+    .chart-container.chart-full-width {
+        grid-column: 1;
+    }
+
+    .table-card {
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .table-header {
+        padding: 1rem 1.25rem;
     }
 
     .filters {
         flex-direction: column;
+        gap: 0.75rem;
     }
 
     .filter-input,
     .filter-select {
         width: 100%;
+        min-width: unset;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+        border-radius: 0;
+    }
+
+    table {
+        font-size: 0.8rem;
+        min-width: 100%;
+        width: max-content;
+    }
+
+    thead th {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        min-width: 80px;
+    }
+
+    tbody td {
+        padding: 0.75rem 0.5rem;
+        white-space: nowrap;
+        min-width: 80px;
+    }
+
+    /* Tornar primeira coluna sticky em mobile */
+    thead th:first-child,
+    tbody td:first-child {
+        position: sticky;
+        left: 0;
+        background: inherit;
+        z-index: 2;
+        box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+    }
+
+    thead th:first-child {
+        background: var(--primary-color);
+        z-index: 3;
+    }
+
+    tbody td:first-child {
+        background: var(--white);
+        font-weight: 500;
+    }
+
+    tbody tr:hover td:first-child {
+        background: var(--light-bg);
     }
 
     .pagination-container {
         flex-direction: column;
         align-items: stretch;
         gap: 1rem;
+        padding: 1rem;
     }
 
-    .pagination-info,
+    .pagination-info {
+        text-align: center;
+        font-size: 0.85rem;
+    }
+
     .pagination-controls {
         justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .pagination-btn {
+        padding: 0.6rem 0.9rem;
+        font-size: 0.9rem;
+    }
+
+    .pagination-page {
+        margin: 0 0.25rem;
+        font-size: 0.85rem;
     }
 
     .per-page-select {
         width: 100%;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+    }
+
+    .info-section {
+        padding: 1.5rem;
+        border-radius: 8px;
+    }
+
+    .info-content p {
+        font-size: 0.95rem;
+    }
+
+    footer {
+        padding: 1.5rem 0;
+        margin-top: 3rem;
+    }
+
+    footer p {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 480px) {
+    header h1 {
+        font-size: 1.5rem;
+    }
+
+    header .subtitle {
+        font-size: 0.9rem;
+    }
+
+    .container {
+        padding: 0 0.75rem;
+    }
+
+    section h2 {
+        font-size: 1.3rem;
+    }
+
+    .indicator-value {
+        font-size: 1.5rem;
+    }
+
+    .chart-container {
+        padding: 0.75rem;
+    }
+
+    .chart-container h3 {
+        font-size: 0.95rem;
+    }
+
+    .chart-container canvas {
+        max-height: 220px !important;
     }
 
     table {
-        font-size: 0.8rem;
+        font-size: 0.7rem;
     }
 
     thead th,
     tbody td {
-        padding: 0.75rem 0.5rem;
+        padding: 0.5rem 0.35rem;
+        font-size: 0.7rem;
+        min-width: 70px;
+    }
+    
+    thead th:first-child,
+    tbody td:first-child {
+        min-width: 60px;
+    }
+
+    .pagination-btn {
+        padding: 0.5rem 0.65rem;
+        font-size: 0.8rem;
+        min-width: 36px;
+        min-height: 36px;
+    }
+
+    .pagination-page {
+        font-size: 0.75rem;
+    }
+
+    .filter-input,
+    .filter-select {
+        font-size: 0.95rem;
     }
 }
 

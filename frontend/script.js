@@ -979,20 +979,51 @@ function configurarIndicadoresInterativos() {
 }
 
 // Inicialização extra após dashboard
+function configurarTooltipsGraficos() {
+    const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    document.querySelectorAll('.info-icon[data-tooltip]').forEach(icon => {
+        const text = icon.getAttribute('data-tooltip');
+        if (!text) return;
+        const tooltip = document.createElement('div');
+        tooltip.className = 'chart-info-tooltip';
+        tooltip.textContent = text;
+        icon.appendChild(tooltip);
+        const show = () => tooltip.classList.add('visible');
+        const hide = () => tooltip.classList.remove('visible');
+        if (isTouch) {
+            icon.addEventListener('click', e => {
+                e.stopPropagation();
+                tooltip.classList.toggle('visible');
+            });
+            document.addEventListener('click', () => hide());
+        } else {
+            icon.addEventListener('mouseenter', show);
+            icon.addEventListener('mouseleave', hide);
+            icon.addEventListener('focus', show);
+            icon.addEventListener('blur', hide);
+        }
+        icon.addEventListener('keydown', e => {
+            if (e.key === 'Escape') hide();
+            if ((e.key === 'Enter' || e.key === ' ') && isTouch) {
+                e.preventDefault();
+                tooltip.classList.toggle('visible');
+            }
+        });
+    });
+}
 function inicializarInteracoesExtras() {
     adicionarResetFiltros();
     configurarBuscaGlobal();
     ativarClickLinhas();
     configurarIndicadoresInterativos();
+    configurarTooltipsGraficos();
     // Registrar plugin global para doughnut center text
-    // Chart.js v4: avoid deprecated/unsupported getPlugin; safely register once
     try {
         const already = Chart.registry?.plugins?.some(p => p.id === 'centerText');
         if (!already) {
             Chart.register(centerTextPlugin);
         }
     } catch (e) {
-        // Fallback: attempt direct register; duplicate register is benign
         Chart.register(centerTextPlugin);
     }
 }

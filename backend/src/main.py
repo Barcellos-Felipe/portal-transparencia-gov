@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -67,7 +67,7 @@ async def _run_update():
     try:
         cache = CacheManager(db)
 
-        def update_db(dataset_key: str, data: list) -> None:
+        def update_db(dataset_key: str, data: str) -> None:
             """Callback to update database for each dataset."""
             cache.set(dataset_key, data)
             logging.info(f'Updated dataset: {dataset_key}')
@@ -89,17 +89,21 @@ async def root() -> Dict[str, Any]:
 def list_data(db: Session = Depends(get_db)) -> Dict[str, Any]:
     from .database import CachedData
 
-    rows = db.query(CachedData).all()
-    return {getattr(row, 'data_type'): row.updated_at.isoformat() + 'Z' for row in rows}
+    # Only select metadata to avoid loading giant data blobs into memory
+    rows = db.query(CachedData.data_type, CachedData.updated_at).all()
+    return {row.data_type: row.updated_at.isoformat() + 'Z' for row in rows}
 
 
 @app.get('/api/data/{data_type}')
 def get_data(data_type: str, db: Session = Depends(get_db)) -> Any:
     cache = CacheManager(db)
-    data = cache.get(data_type)
+    data = cache.get(data_type) # This is now a raw JSON string
     if data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Data not found')
-    return data
+    
+    # Return as Response with application/json media type to avoid FastAPI 
+    # re-serializing the string (which would use more RAM and be slower)
+    return Response(content=data, media_type='application/json')
 
 
 @app.post('/api/refresh')
@@ -115,7 +119,7 @@ async def refresh(token: str | None = None, force: bool = True) -> Dict[str, str
         cache = CacheManager(db)
         updated_keys = []
 
-        def update_db(dataset_key: str, data: list) -> None:
+        def update_db(dataset_key: str, data: str) -> None:
             """Callback to update database for each dataset."""
             cache.set(dataset_key, data)
             updated_keys.append(dataset_key)
@@ -123,10 +127,9 @@ async def refresh(token: str | None = None, force: bool = True) -> Dict[str, str
         if force:
             await perform_update_streaming(update_db)
         else:
-            datasets = await fetch_all_datasets(force=False)
-            for key, data in datasets.items():
-                cache.set(key, data)
-                updated_keys.append(key)
+            # Note: fetch_all_datasets is legacy and might use more RAM
+            # Encouraging always using perform_update_streaming
+            await perform_update_streaming(update_db)
 
         return {'status': 'ok', 'updated': ', '.join(updated_keys)}
     finally:

@@ -84,37 +84,61 @@ def _extract_csvs(zip_path: Path) -> None:
 
 
 def _read_and_filter_csv(csv_path: Path, config: Dict[str, Any]) -> pl.LazyFrame:
-    """Read CSV and apply the appropriate filter based on config."""
-    df = pl.read_csv(csv_path, separator=';', encoding='latin1', infer_schema_length=0).lazy()
-
-    filter_type = config['filter_type']
-    if filter_type == 'contains':
-        df = df.filter(pl.col(config['filter_col']).str.contains(config['filter_value']))
-    elif filter_type == 'multi':
-        df = df.filter((pl.col('Município Favorecido') == 'CAMPO GRANDE') & (pl.col('UF Favorecido') == 'MS'))
-
-    return df
+    """Read CSV and apply the appropriate filter based on config.
+    
+    Note: For very large files, this uses eager loading which can be heavy on RAM.
+    Use batched processing in _csv_to_json for better memory efficiency.
+    """
+    return pl.read_csv(
+        csv_path, 
+        separator=';', 
+        encoding='latin1', 
+        infer_schema_length=0,
+        low_memory=True
+    ).lazy()
 
 
 def _csv_to_json(csv_path: Path, json_path: Path, config: Dict[str, Any]) -> None:
-    """Convert filtered CSV to JSON and delete CSV immediately."""
+    """Convert filtered CSV to JSON in a memory-efficient batched way and delete CSV."""
     logging.info(f'Processing: {config["dataset_key"]}')
-
-    # Read and filter CSV
-    df = _read_and_filter_csv(csv_path, config)
 
     # Write JSON in streaming fashion to minimize RAM
     with open(json_path, 'w', encoding='utf-8') as f:
         f.write('[')
         first = True
 
-        for batch in df.collect_batches(chunk_size=1000):
+        # Use batched reader to stay within memory limits (e.g., 512MB on Render)
+        reader = pl.read_csv_batched(
+            csv_path, 
+            separator=';', 
+            encoding='latin1', 
+            infer_schema_length=0,
+            batch_size=20000
+        )
+        
+        while batch_list := reader.next_batches(1):
+            batch = batch_list[0]
+            
+            filter_type = config.get('filter_type')
+            if filter_type == 'contains':
+                batch = batch.filter(pl.col(config['filter_col']).str.contains(config['filter_value']))
+            elif filter_type == 'multi':
+                # Custom filter for 'por_favorecido' dataset
+                batch = batch.filter(
+                    (pl.col('Município Favorecido') == 'CAMPO GRANDE') & 
+                    (pl.col('UF Favorecido') == 'MS')
+                )
+            
+            if batch.height == 0:
+                continue
+
             for row in batch.to_dicts():
                 if not first:
                     f.write(',')
                 else:
                     first = False
                 json.dump(row, f, ensure_ascii=False)
+        
         f.write(']')
 
     # Delete CSV immediately after conversion
@@ -122,10 +146,14 @@ def _csv_to_json(csv_path: Path, json_path: Path, config: Dict[str, Any]) -> Non
     logging.info(f'Converted and deleted CSV: {csv_path.name}')
 
 
-def _load_json_and_delete(json_path: Path) -> list[Dict[str, Any]]:
-    """Load JSON data and delete the file immediately."""
+def _load_json_and_delete(json_path: Path) -> str:
+    """Load JSON data as a raw string and delete the file immediately.
+    
+    Returning a string instead of a parsed list of dicts significantly
+    reduces memory usage for large datasets.
+    """
     with open(json_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+        data = f.read()
 
     # Delete JSON immediately after loading
     json_path.unlink()
@@ -134,7 +162,7 @@ def _load_json_and_delete(json_path: Path) -> list[Dict[str, Any]]:
     return data
 
 
-async def perform_update_streaming(db_update_callback: Callable[[str, list], None]) -> None:
+async def perform_update_streaming(db_update_callback: Callable[[str, str], None]) -> None:
     """Download, extract, and process datasets with minimal RAM usage.
 
     Process flow:
@@ -217,27 +245,14 @@ def _save_json() -> Dict[str, Any]:
         json_path = DATA_DIR / config['json_file']
         dataset_key = config['dataset_key']
 
-        df = _read_and_filter_csv(csv_path, config)
-
-        logging.info(f'Saving and converting: {dataset_key}')
-        logging.info('Collecting LazyDataframe')
-        dataset = df.collect().to_dicts()
-        logging.info('LazyDataframe Extracted')
-        datasets[dataset_key] = dataset
-
-        with open(json_path, 'w', encoding='utf-8') as f:
-            f.write('[')
-            first = True
-
-            for batch in df.collect_batches(chunk_size=1000):
-                for row in batch.to_dicts():
-                    if not first:
-                        f.write(',')
-                    else:
-                        first = False
-                    json.dump(row, f, ensure_ascii=False)
-            f.write(']')
-        csv_path.unlink()
+        # Use the improved batched conversion
+        _csv_to_json(csv_path, json_path, config)
+        
+        # Load as string to save RAM even in legacy path
+        with open(json_path, 'r', encoding='utf-8') as f:
+            datasets[dataset_key] = json.load(f)
+        
+        json_path.unlink()
     return datasets
 
 

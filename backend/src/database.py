@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import JSON, Column, DateTime, Integer, String, create_engine, text
+from sqlalchemy import Column, DateTime, Integer, String, Text, create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -27,7 +27,7 @@ class CachedData(Base): # type: ignore
 
     id = Column(Integer, primary_key=True, index=True)
     data_type = Column(String, index=True)
-    data = Column(JSON)
+    data = Column(Text)  # Changed from JSON to Text to save memory on large datasets
     updated_at = Column(DateTime, default=datetime.now(tz=TZ_MINUS_4))
 
 

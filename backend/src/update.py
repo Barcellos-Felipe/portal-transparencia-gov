@@ -6,9 +6,11 @@ Use perform_update() to download, process, and persist datasets.
 
 from __future__ import annotations
 
+import gc
 import json
 import logging
 import os
+import time
 import zipfile
 from pathlib import Path
 from typing import Any, Callable, Dict
@@ -83,19 +85,26 @@ def _extract_csvs(zip_path: Path) -> None:
     zip_path.unlink()
 
 
+def _convert_to_utf8(csv_path: Path) -> None:
+    """Convert a Latin-1 encoded CSV file to UTF-8 in-place.
+
+    Reads and writes in chunks to keep memory usage low.
+    """
+    tmp_path = csv_path.with_suffix('.utf8.csv')
+    with open(csv_path, 'r', encoding='latin1') as src, open(tmp_path, 'w', encoding='utf-8') as dst:
+        while chunk := src.read(1024 * 1024):  # 1 MB chunks
+            dst.write(chunk)
+    csv_path.unlink()
+    tmp_path.rename(csv_path)
+
+
 def _read_and_filter_csv(csv_path: Path, config: Dict[str, Any]) -> pl.LazyFrame:
     """Read CSV and apply the appropriate filter based on config.
-    
+
     Note: For very large files, this uses eager loading which can be heavy on RAM.
     Use batched processing in _csv_to_json for better memory efficiency.
     """
-    return pl.read_csv(
-        csv_path, 
-        separator=';', 
-        encoding='latin1', 
-        infer_schema_length=0,
-        low_memory=True
-    ).lazy()
+    return pl.read_csv(csv_path, separator=';', encoding='latin1', infer_schema_length=0, low_memory=True).lazy()
 
 
 def _csv_to_json(csv_path: Path, json_path: Path, config: Dict[str, Any]) -> None:
@@ -108,27 +117,21 @@ def _csv_to_json(csv_path: Path, json_path: Path, config: Dict[str, Any]) -> Non
         first = True
 
         # Use batched reader to stay within memory limits (e.g., 512MB on Render)
-        reader = pl.read_csv_batched(
-            csv_path, 
-            separator=';', 
-            encoding='latin1', 
-            infer_schema_length=0,
-            batch_size=20000
-        )
-        
+        # CSV must already be UTF-8 (see _convert_to_utf8)
+        reader = pl.read_csv_batched(csv_path, separator=';', infer_schema_length=0, batch_size=20000)
+
         while batch_list := reader.next_batches(1):
             batch = batch_list[0]
-            
+
             filter_type = config.get('filter_type')
             if filter_type == 'contains':
                 batch = batch.filter(pl.col(config['filter_col']).str.contains(config['filter_value']))
             elif filter_type == 'multi':
                 # Custom filter for 'por_favorecido' dataset
                 batch = batch.filter(
-                    (pl.col('Município Favorecido') == 'CAMPO GRANDE') & 
-                    (pl.col('UF Favorecido') == 'MS')
+                    (pl.col('Município Favorecido') == 'CAMPO GRANDE') & (pl.col('UF Favorecido') == 'MS')
                 )
-            
+
             if batch.height == 0:
                 continue
 
@@ -138,17 +141,29 @@ def _csv_to_json(csv_path: Path, json_path: Path, config: Dict[str, Any]) -> Non
                 else:
                     first = False
                 json.dump(row, f, ensure_ascii=False)
-        
+
         f.write(']')
 
-    # Delete CSV immediately after conversion
-    csv_path.unlink()
+    # Release the Polars reader file handle before deleting on Windows
+    del reader
+    gc.collect()
+
+    # Delete CSV with retry for Windows file-locking
+    for attempt in range(5):
+        try:
+            csv_path.unlink()
+            break
+        except PermissionError:
+            if attempt == 4:
+                logging.warning(f'Could not delete {csv_path.name} after 5 attempts, skipping.')
+            else:
+                time.sleep(0.5)
     logging.info(f'Converted and deleted CSV: {csv_path.name}')
 
 
 def _load_json_and_delete(json_path: Path) -> str:
     """Load JSON data as a raw string and delete the file immediately.
-    
+
     Returning a string instead of a parsed list of dicts significantly
     reduces memory usage for large datasets.
     """
@@ -191,6 +206,10 @@ async def perform_update_streaming(db_update_callback: Callable[[str, str], None
         csv_path = DATA_DIR / config['csv_file']
         json_path = DATA_DIR / config['json_file']
         dataset_key = config['dataset_key']
+
+        # Convert Latin-1 CSV to UTF-8 so Polars can read it properly
+        logging.info(f'Converting encoding: {csv_path.name}')
+        _convert_to_utf8(csv_path)
 
         # Convert CSV to JSON (deletes CSV)
         _csv_to_json(csv_path, json_path, config)
@@ -247,11 +266,11 @@ def _save_json() -> Dict[str, Any]:
 
         # Use the improved batched conversion
         _csv_to_json(csv_path, json_path, config)
-        
+
         # Load as string to save RAM even in legacy path
         with open(json_path, 'r', encoding='utf-8') as f:
             datasets[dataset_key] = json.load(f)
-        
+
         json_path.unlink()
     return datasets
 

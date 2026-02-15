@@ -7,3 +7,4 @@ _templates
 data
 backend/tmp_data
 *.zip
+*.pyc

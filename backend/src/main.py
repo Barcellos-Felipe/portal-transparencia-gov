@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from .cache_manager import CacheManager
 from .database import CachedData, SessionLocal, get_db, init_db
-from .gov_api import fetch_all_datasets
 
 
 def get_allowed_origins() -> list[str]:

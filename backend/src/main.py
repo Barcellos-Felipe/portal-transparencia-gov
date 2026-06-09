@@ -97,10 +97,10 @@ def list_data(db: Session = Depends(get_db)) -> Dict[str, Any]:
 @app.get('/api/data/{data_type}')
 def get_data(data_type: str, db: Session = Depends(get_db)) -> Any:
     cache = CacheManager(db)
-    data = cache.get(data_type) # This is now a raw JSON string
+    data = cache.get(data_type)
     if data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Data not found')
-    
+
     # Return as Response with application/json media type to avoid FastAPI 
     # re-serializing the string (which would use more RAM and be slower)
     return Response(content=data, media_type='application/json')
@@ -127,8 +127,6 @@ async def refresh(token: str | None = None, force: bool = True) -> Dict[str, str
         if force:
             await perform_update_streaming(update_db)
         else:
-            # Note: fetch_all_datasets is legacy and might use more RAM
-            # Encouraging always using perform_update_streaming
             await perform_update_streaming(update_db)
 
         return {'status': 'ok', 'updated': ', '.join(updated_keys)}

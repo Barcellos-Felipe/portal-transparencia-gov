@@ -1,5 +1,3 @@
-"""High-level data access layer used by the scheduler and refresh endpoint."""
-
 from __future__ import annotations
 
 import os

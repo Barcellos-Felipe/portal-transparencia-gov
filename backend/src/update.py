@@ -1,9 +1,3 @@
-"""Data retrieval and transformation utilities.
-
-Converted from a run-on-import script into reusable functions.
-Use perform_update() to download, process, and persist datasets.
-"""
-
 from __future__ import annotations
 
 import gc
@@ -86,7 +80,8 @@ def _extract_csvs(zip_path: Path) -> None:
 
 
 def _convert_to_utf8(csv_path: Path) -> None:
-    """Convert a Latin-1 encoded CSV file to UTF-8 in-place.
+    """
+    Convert a Latin-1 encoded CSV file to UTF-8 in-place.
 
     Reads and writes in chunks to keep memory usage low.
     """
@@ -99,10 +94,8 @@ def _convert_to_utf8(csv_path: Path) -> None:
 
 
 def _read_and_filter_csv(csv_path: Path, config: Dict[str, Any]) -> pl.LazyFrame:
-    """Read CSV and apply the appropriate filter based on config.
-
-    Note: For very large files, this uses eager loading which can be heavy on RAM.
-    Use batched processing in _csv_to_json for better memory efficiency.
+    """
+    Read CSV and apply the appropriate filter based on config.
     """
     return pl.read_csv(csv_path, separator=';', encoding='latin1', infer_schema_length=0, low_memory=True).lazy()
 
@@ -117,7 +110,7 @@ def _csv_to_json(csv_path: Path, json_path: Path, config: Dict[str, Any]) -> Non
         first = True
 
         # Use batched reader to stay within memory limits (e.g., 512MB on Render)
-        # CSV must already be UTF-8 (see _convert_to_utf8)
+        # CSV must already be UTF-8
         reader = pl.read_csv_batched(csv_path, separator=';', infer_schema_length=0, batch_size=20000)
 
         while batch_list := reader.next_batches(1):
@@ -163,9 +156,6 @@ def _csv_to_json(csv_path: Path, json_path: Path, config: Dict[str, Any]) -> Non
 
 def _load_json_and_delete(json_path: Path) -> str:
     """Load JSON data as a raw string and delete the file immediately.
-
-    Returning a string instead of a parsed list of dicts significantly
-    reduces memory usage for large datasets.
     """
     with open(json_path, 'r', encoding='utf-8') as f:
         data = f.read()

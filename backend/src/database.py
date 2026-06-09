@@ -27,7 +27,7 @@ class CachedData(Base): # type: ignore
 
     id = Column(Integer, primary_key=True, index=True)
     data_type = Column(String, index=True)
-    data = Column(Text)  # Changed from JSON to Text to save memory on large datasets
+    data = Column(Text)
     updated_at = Column(DateTime, default=datetime.now(tz=TZ_MINUS_4))
 
 

@@ -638,12 +638,20 @@ function popularFiltros() {
         selectFuncao.appendChild(option);
     });
     
-    const selectAno = document.getElementById('filter-emendas-ano');
+    const selectAnoEmendas = document.getElementById('filter-emendas-ano');
     anos.forEach(ano => {
         const option = document.createElement('option');
         option.value = ano;
         option.textContent = ano;
-        selectAno.appendChild(option);
+        selectAnoEmendas.appendChild(option);
+    });
+
+    const selectAnoFavorecidos = document.getElementById('filter-favorecidos-ano');
+    anos.forEach(ano => {
+        const option = document.createElement('option');
+        option.value = ano;
+        option.textContent = ano;
+        selectAnoFavorecidos.appendChild(option);
     });
 
     // Filtros de Convênios
@@ -692,12 +700,12 @@ function configurarFiltros() {
     // Filtros de Emendas
     const filterAutor = document.getElementById('filter-emendas-autor');
     const filterFuncao = document.getElementById('filter-emendas-funcao');
-    const filterAno = document.getElementById('filter-emendas-ano');
+    const filterAnoEmendas = document.getElementById('filter-emendas-ano');
 
     const filtrarEmendas = () => {
         const autor = filterAutor.value.toLowerCase();
         const funcao = filterFuncao.value;
-        const ano = filterAno.value;
+        const ano = filterAnoEmendas.value;
 
         tabelasConfig.emendas.dadosFiltrados = dadosEmendas.filter(emenda => {
             const matchAutor = !autor || (emenda['Nome do Autor da Emenda'] || '').toLowerCase().includes(autor);
@@ -712,7 +720,7 @@ function configurarFiltros() {
 
     filterAutor.addEventListener('input', filtrarEmendas);
     filterFuncao.addEventListener('change', filtrarEmendas);
-    filterAno.addEventListener('change', filtrarEmendas);
+    filterAnoEmendas.addEventListener('change', filtrarEmendas);
 
     // Filtros de Convênios
     const filterConvenente = document.getElementById('filter-convenios-convenente');
@@ -739,17 +747,20 @@ function configurarFiltros() {
     const filterNome = document.getElementById('filter-favorecidos-nome');
     const filterTipo = document.getElementById('filter-favorecidos-tipo');
     const filterAutorFav = document.getElementById('filter-favorecidos-autor');
+    const filterAnoFavorecidos = document.getElementById('filter-favorecidos-ano'); 
 
     const filtrarFavorecidos = () => {
         const nome = filterNome.value.toLowerCase();
         const tipo = filterTipo.value;
         const autor = filterAutorFav.value;
+        const ano = filterAnoFavorecidos.value;
 
         tabelasConfig.favorecidos.dadosFiltrados = dadosFavorecidos.filter(favorecido => {
             const matchNome = !nome || (favorecido['Favorecido'] || '').toLowerCase().includes(nome);
             const matchTipo = !tipo || favorecido['Tipo Favorecido'] === tipo;
             const matchAutor = !autor || favorecido['Nome do Autor da Emenda'] === autor;
-            return matchNome && matchTipo && matchAutor;
+            const matchAno = !ano || String(favorecido['Ano/Mês']).startsWith(ano);
+            return matchNome && matchTipo && matchAutor && matchAno;
         });
 
         tabelasConfig.favorecidos.paginacao.paginaAtual = 1;
@@ -759,6 +770,7 @@ function configurarFiltros() {
     filterNome.addEventListener('input', filtrarFavorecidos);
     filterTipo.addEventListener('change', filtrarFavorecidos);
     filterAutorFav.addEventListener('change', filtrarFavorecidos);
+    filterAnoFavorecidos.addEventListener('change', filtrarFavorecidos);
 }
 
 function configurarFiltroAno() {

@@ -2,6 +2,7 @@
 let dadosEmendas = [];
 let dadosConvenios = [];
 let dadosFavorecidos = [];
+let anoSelecionado = '';
 
 // Configuração centralizada de tabelas
 const tabelasConfig = {
@@ -73,6 +74,18 @@ const formatarNumero = (valor) => {
     }).format(valor);
 };
 
+const getDadosFavorecidosFiltrados = () => {
+    if (!anoSelecionado) return dadosFavorecidos;
+    return dadosFavorecidos.filter(f => 
+        String(f['Ano/Mês']).startsWith(anoSelecionado)
+    );
+}
+
+const getDadosEmendasFiltrados = () => {
+    if (!anoSelecionado) return dadosEmendas;
+    return dadosEmendas.filter(e => e['Ano da Emenda'] === anoSelecionado);
+};
+
 // Utilitários compartilhados para gráficos
 const isMobile = () => window.innerWidth < 768;
 const obterFontSize = (mobileSize, desktopSize) => isMobile() ? mobileSize : desktopSize;
@@ -133,7 +146,9 @@ function inicializarDashboard() {
     
     popularTabelas();
     popularFiltros();
+    popularFiltroAno();
     configurarFiltros();
+    configurarFiltroAno();
     configurarPaginacao();
     configurarOrdenacao();
     atualizarDataAtualizacao();
@@ -142,16 +157,18 @@ function inicializarDashboard() {
 
 // Atualizar Indicadores
 function atualizarIndicadores() {
-    const totalEmpenhado = dadosEmendas.reduce((acc, curr) => 
+    const dados = getDadosEmendasFiltrados();
+
+    const totalEmpenhado = dados.reduce((acc, curr) => 
         acc + (parseFloat(curr['Valor Empenhado']) || 0), 0);
     
-    const totalLiquidado = dadosEmendas.reduce((acc, curr) => 
+    const totalLiquidado = dados.reduce((acc, curr) => 
         acc + (parseFloat(curr['Valor Liquidado']) || 0), 0);
     
-    const totalPago = dadosEmendas.reduce((acc, curr) => 
+    const totalPago = dados.reduce((acc, curr) => 
         acc + (parseFloat(curr['Valor Pago']) || 0), 0);
     
-    const totalEmendas = dadosEmendas.length;
+    const totalEmendas = dados.length;
     const totalConvenios = dadosConvenios.length;
     
     const favoreicosUnicos = new Set(
@@ -176,15 +193,16 @@ function criarGraficos() {
 }
 
 function criarGraficoFuncao() {
+    const dados = getDadosEmendasFiltrados();
     const funcoes = {};
     
-    dadosEmendas.forEach(emenda => {
+    dados.forEach(emenda => {
         const funcao = emenda['Nome Função'] || 'Não especificado';
         const valor = parseFloat(emenda['Valor Empenhado']) || 0;
         funcoes[funcao] = (funcoes[funcao] || 0) + valor;
     });
 
-    const dados = Object.entries(funcoes)
+    const dadosFuncao = Object.entries(funcoes)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8);
 
@@ -192,10 +210,10 @@ function criarGraficoFuncao() {
     funcaoChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: dados.map(d => d[0]),
+            labels: dadosFuncao.map(d => d[0]),
             datasets: [{
                 label: 'Valor Empenhado',
-                data: dados.map(d => d[1]),
+                data: dadosFuncao.map(d => d[1]),
                 backgroundColor: 'rgba(52, 152, 219, 0.6)',
                 borderColor: 'rgba(52, 152, 219, 1)',
                 borderWidth: 1
@@ -241,9 +259,10 @@ function criarGraficoFuncao() {
 }
 
 function criarGraficoAno() {
+    const dados = dadosEmendas;
     const anos = {};
     
-    dadosEmendas.forEach(emenda => {
+    dados.forEach(emenda => {
         const ano = emenda['Ano da Emenda'];
         const valorEmpenhado = parseFloat(emenda['Valor Empenhado']) || 0;
         const valorPago = parseFloat(emenda['Valor Pago']) || 0;
@@ -327,15 +346,16 @@ function criarGraficoAno() {
 }
 
 function criarGraficoParlamentares() {
+    const dados = getDadosEmendasFiltrados();
     const parlamentares = {};
     
-    dadosEmendas.forEach(emenda => {
+    dados.forEach(emenda => {
         const nome = emenda['Nome do Autor da Emenda'] || 'Não especificado';
         const valor = parseFloat(emenda['Valor Empenhado']) || 0;
         parlamentares[nome] = (parlamentares[nome] || 0) + valor;
     });
 
-    const dados = Object.entries(parlamentares)
+    const dadosParlamentares = Object.entries(parlamentares)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
 
@@ -343,10 +363,10 @@ function criarGraficoParlamentares() {
     parlamentaresChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: dados.map(d => d[0]),
+            labels: dadosParlamentares.map(d => d[0]),
             datasets: [{
                 label: 'Valor Empenhado',
-                data: dados.map(d => d[1]),
+                data: dadosParlamentares.map(d => d[1]),
                 backgroundColor: 'rgba(52, 152, 219, 0.6)',
                 borderColor: 'rgba(52, 152, 219, 1)',
                 borderWidth: 1
@@ -391,23 +411,24 @@ function criarGraficoParlamentares() {
 }
 
 function criarGraficoTipoEmenda() {
+    const dados = getDadosEmendasFiltrados();
     const tipos = {};
     
-    dadosEmendas.forEach(emenda => {
+    dados.forEach(emenda => {
         const tipo = emenda['Tipo de Emenda'] || 'Não especificado';
         const valor = parseFloat(emenda['Valor Empenhado']) || 0;
         tipos[tipo] = (tipos[tipo] || 0) + valor;
     });
 
-    const dados = Object.entries(tipos).sort((a, b) => b[1] - a[1]);
+    const dadosTipo = Object.entries(tipos).sort((a, b) => b[1] - a[1]);
 
     const ctx = document.getElementById('tipoEmendaChart').getContext('2d');
     tipoEmendaChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: dados.map(d => d[0]),
+            labels: dadosTipo.map(d => d[0]),
             datasets: [{
-                data: dados.map(d => d[1]),
+                data: dadosTipo.map(d => d[1]),
                 backgroundColor: [
                     'rgba(52, 152, 219, 0.7)',
                     'rgba(46, 204, 113, 0.7)',
@@ -450,7 +471,7 @@ function criarGraficoTipoEmenda() {
 function criarGraficoFavorecidos() {
     const favorecidos = {};
     
-    dadosFavorecidos.forEach(item => {
+    getDadosFavorecidosFiltrados().forEach(item => {
         const nome = item['Favorecido'] || 'Não especificado';
         const valor = parseFloat(item['Valor Recebido']) || 0;
         favorecidos[nome] = (favorecidos[nome] || 0) + valor;
@@ -655,6 +676,17 @@ function popularFiltros() {
     });
 }
 
+function popularFiltroAno() {
+    const anos = [...new Set(dadosEmendas.map(e => e['Ano da Emenda']))].sort();
+    const select = document.getElementById('year-filter');
+    anos.forEach(ano => {
+        const option = document.createElement('option');
+        option.value = ano;
+        option.textContent = ano;
+        select.appendChild(option);
+    });
+}
+
 // Configurar Filtros
 function configurarFiltros() {
     // Filtros de Emendas
@@ -727,6 +759,17 @@ function configurarFiltros() {
     filterNome.addEventListener('input', filtrarFavorecidos);
     filterTipo.addEventListener('change', filtrarFavorecidos);
     filterAutorFav.addEventListener('change', filtrarFavorecidos);
+}
+
+function configurarFiltroAno() {
+    document.getElementById('year-filter').addEventListener('change', (e) => {
+        anoSelecionado = e.target.value;
+        atualizarIndicadores();
+        [funcaoChart, anoChart, parlamentaresChart, tipoEmendaChart, favorecidosChart].forEach(chart => {
+            if (chart) chart.destroy();
+        });
+        criarGraficos();
+    });
 }
 
 // Configurar Paginação
